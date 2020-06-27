@@ -1,4 +1,6 @@
+use std::path::Path;
 use std::fs;
+
 use clap::{Arg, App, SubCommand};
 
 fn main() {
@@ -25,13 +27,23 @@ fn main() {
     vocabulist_rs::initialize_database(database_path);
 
     if let Some(matches) = matches.subcommand_matches("import") {
-        let path =  matches.value_of("path").unwrap();
-        let attr = fs::metadata(path).expect("Can't get file attribute");
+        let path =  Path::new(matches.value_of("path").unwrap());
 
-        if attr.is_dir() {
+        if path.is_dir() {
             // Parse each file in the directory
+            for path in fs::read_dir(path).expect("Could not get file list") {
+                if let Ok(file) = path {
+                    println!("Importing {}", &file.path().to_str().unwrap());
+                    vocabulist_rs::import_file(database_path, &file.path().to_str().unwrap());
+                    println!("");
+                }
+            }
         } else {
-            vocabulist_rs::import_file(database_path, path);
+            if let Some(file) = path.to_str() {
+                println!("Importing {}", file);
+                vocabulist_rs::import_file(database_path, file);
+                println!("");
+            }
         }
     }
 }

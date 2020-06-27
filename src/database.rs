@@ -1,4 +1,5 @@
 use rusqlite::{params, Connection};
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Expression};
 
@@ -35,9 +36,15 @@ pub fn deduplicate_expression_list(conn: &Connection, sentence_list: Vec<String>
 }
 
 pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expression>) {
+    let pb = ProgressBar::new(expression_list.len() as u64);
+    pb.set_message("Importing");
+    pb.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.black} [{bar:40.black/black}] [{pos:>7}/{len:7}] {msg}")
+            .progress_chars("##-"));
+
     let tx = conn.transaction().expect("Unable to create transaction");
 
-    for expression in expression_list.iter() {
+    for expression in pb.wrap_iter(expression_list.iter()) {
         let e: &str = expression.get_expression();
         let pos = &expression.get_pos().as_ref().expect("pos is required").0[0];
         let surface_string = &expression.get_surface_string().as_ref().expect("surface string is required").0[0];
@@ -92,6 +99,8 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
     }
 
     tx.commit().expect("Unable to commit transaction");
+
+    pb.finish_with_message("Imported");
 }
 pub fn initialize_database(path: &str) {
     let conn = Connection::open(path).expect("Cannot open a connection to the database");

@@ -29,15 +29,6 @@ fn open_file(path: &str) -> Vec<String> {
     sentence_list
 }
 
-fn import_file(conn: &mut Connection, path: &str) {
-    let sentence_list = open_file(path);
-    let expression_list = tokenizer::tokenize_sentence_list(&sentence_list);
-    let expression_list = database::deduplicate_expression_list(&conn, sentence_list, expression_list);    
-    
-    database::insert_expression_list(conn, expression_list);
-
-}
-
 pub fn import(p: Preference, m: &ArgMatches) {
     // Initialize the database
     let database_path = p.database_path.as_ref();
@@ -45,19 +36,28 @@ pub fn import(p: Preference, m: &ArgMatches) {
 
     let path =  Path::new(m.value_of("path").unwrap());
 
+    fn import_file(conn: &mut Connection, path: &str) {
+        let sentence_list = open_file(path);
+        let expression_list = tokenizer::tokenize_sentence_list(&sentence_list);
+        let expression_list = database::deduplicate_expression_list(&conn, sentence_list, expression_list);    
+        
+        database::insert_expression_list(conn, expression_list);
+
+    }
+
     if path.is_dir() {
         // Parse each file in the directory
         for path in fs::read_dir(path).expect("Could not get file list") {
             if let Ok(file) = path {
                 println!("Importing {}", &file.path().to_str().unwrap());
-                crate::import_file(&mut conn, &file.path().to_str().unwrap());
+                import_file(&mut conn, &file.path().to_str().unwrap());
                 println!("");
             }
         }
     } else {
         if let Some(file) = path.to_str() {
             println!("Importing {}", file);
-            crate::import_file(&mut conn, file);
+            import_file(&mut conn, file);
             println!("");
         }
     }
@@ -97,5 +97,24 @@ pub fn exclude(p: Preference, m: &ArgMatches) {
                 .expect("Failed to update database");
 
             pb.finish_with_message("Excluded");
+    }
+}
+
+pub fn include(p: Preference, m: &ArgMatches) {
+    // Initialize the database
+    let database_path = p.database_path.as_ref();
+    let mut conn = database::connect(database_path);
+
+    if let Some(path) = m.value_of("path") {
+            let file_content = fs::read_to_string(path).expect("Failed to open file");
+            let line_list = file_content.split_whitespace();
+            let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+            let len: u64 = expression_list.len() as u64;
+            let pb = progress_bar::new(len);
+
+            crate::database::update_is_excluded(&mut conn, expression_list, false, &|| pb.inc(1))
+                .expect("Failed to update database");
+
+            pb.finish_with_message("Included");
     }
 }

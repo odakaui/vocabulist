@@ -23,6 +23,12 @@ fn main() {
                                             .value_name("PATH")
                                             .required(true)
                                             .help("Path to file of words to exclude")))
+                            .subcommand(SubCommand::with_name("include")
+                                        .about("include expressions")
+                                        .arg(Arg::with_name("path")
+                                            .value_name("PATH")
+                                            .required(true)
+                                            .help("Path to file of words to include")))
                             .subcommand(SubCommand::with_name("list")
                                         .about("list vocabulary")
                                         .arg(Arg::with_name("number")
@@ -61,6 +67,7 @@ fn main() {
         ("import", Some(m)) => vocabulist_rs::import(p, m),
         ("list", Some(m)) => vocabulist_rs::list(p, m),
         ("exclude", Some(m)) => vocabulist_rs::exclude(p, m),
+        ("include", Some(m)) => vocabulist_rs::include(p, m),
         _ => {},
     }
 }

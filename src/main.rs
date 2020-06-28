@@ -21,7 +21,12 @@ fn main() {
                                             .required(true)
                                             .help("Import file/directory to database")))
                             .subcommand(SubCommand::with_name("list")
-                                        .about("list vocabulary"))
+                                        .about("list vocabulary")
+                                        .arg(Arg::with_name("number")
+                                            .value_name("NUM")
+                                            .default_value("-1")
+                                            .required(false)
+                                            .help("Number of entries to list")))
                             .get_matches();
     
     
@@ -49,9 +54,10 @@ fn main() {
                 }
             }
         },
-        ("list", _) => {
+        ("list", Some(sub_match_list)) => {
             println!("Listing Vocabulary");
-            vocabulist_rs::list(database_path);
+            let max = sub_match_list.value_of("number").unwrap().parse::<i32>().unwrap();
+            vocabulist_rs::list(database_path, max);
             println!("");
         },
         _ => {},

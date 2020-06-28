@@ -38,10 +38,18 @@ pub fn import_file(db: &str, path: &str) {
 
 }
 
-pub fn list(db: &str) {
+pub fn list(db: &str, max: i32) {
     let conn = Connection::open(db).expect("Cannot open a connection to the database");
 
-    let mut select_expression = conn.prepare("SELECT expression FROM expressions ORDER BY expression ASC;")
+    let mut query = "SELECT expression FROM expressions ".to_string();
+ 
+    query.push_str("ORDER BY frequency DESC ");
+
+    if max > -1 {
+        query.push_str(&format!("LIMIT {}", max));
+    }
+
+    let mut select_expression = conn.prepare(&query)
         .expect("Unable to prepare select");
 
     let expression_list = select_expression.query_map(params![], |row| {

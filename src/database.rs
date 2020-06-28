@@ -3,6 +3,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Expression};
 
+/// Initialize the database
+///
+/// path: the path to the database
+///
+///
+///
+///
 pub fn initialize_database(path: &str) {
     let conn = Connection::open(path).expect("Cannot open a connection to the database");
 
@@ -71,6 +78,16 @@ pub fn initialize_database(path: &str) {
             ).expect("Cannot create the 'pos_sentences_sstrings_words' table");
 }
 
+/// Take a list of expressions and a list of sentences.
+/// Return a vector of expressions that don't have a sentence in the sentence list.
+///
+///
+///
+///
+///
+///
+///
+///
 pub fn deduplicate_expression_list(conn: &Connection, sentence_list: Vec<String>, expression_list: Vec<Expression>) -> Vec<Expression> {
     let mut duplicate_sentence_list: Vec<String> = Vec::new();
     for sentence in sentence_list.iter() {
@@ -103,6 +120,14 @@ pub fn deduplicate_expression_list(conn: &Connection, sentence_list: Vec<String>
     tmp_expression_list
 }
 
+/// Insert an expression into the database
+///
+///
+///
+///
+///
+///
+///
 pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expression>) {
     let pb = ProgressBar::new(expression_list.len() as u64);
     pb.set_message("Importing");
@@ -169,5 +194,75 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
     tx.commit().expect("Unable to commit transaction");
 
     pb.finish_with_message("Imported");
+}
+
+fn create_select_query(in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, max: i32) -> String {
+    let mut query = "SELECT expression FROM expressions ".to_string();
+
+    if !(in_anki && is_excluded && is_learned) {
+        query.push_str("WHERE ");
+
+        if !in_anki {
+            query.push_str("in_anki = 0 ");
+
+            if !is_excluded || !is_learned {
+                query.push_str("AND ");
+            }
+        }
+         
+        if !is_excluded {
+            query.push_str("is_excluded = 0 ");
+
+            if !is_learned {
+                query.push_str("AND ");
+            }
+        }
+
+        if !is_learned {
+            query.push_str("is_learned = 0 ");
+        }
+    }
+
+    query.push_str("ORDER BY ");
+
+    match order_by {
+        "id" => query.push_str("id "),
+        "expression" => query.push_str("expression "),
+        _ => query.push_str("frequency ")
+    }
+
+    match is_asc {
+        true => query.push_str("ASC "),
+        false => query.push_str("DESC ")
+    }
+
+    if max > -1 {
+        query.push_str(&format!("LIMIT {}", max));
+    }
+
+    query
+}
+
+/// Get a list of expressions for the given parameters
+///
+///
+///
+///
+pub fn select_expression_list(conn: &Connection, in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, limit: i32) {
+    let query = create_select_query(in_anki, is_excluded, is_learned, order_by, is_asc, limit);
+
+    let mut select_expression = conn.prepare(&query)
+        .expect("Unable to prepare select");
+
+    let expression_list = select_expression.query_map(params![], |row| {
+            let expression: String = row.get(0)?;
+            Ok(Expression::new(expression, None, None, None, None, None))
+            }).unwrap();
+
+    for expression in expression_list {
+        if let Ok(expression) = expression {
+            println!("{}", expression.get_expression());
+        }
+    }
 }
 

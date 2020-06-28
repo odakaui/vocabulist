@@ -4,7 +4,7 @@ mod tokenizer;
 
 use std::fs;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection};
 
 use data_types::{Expression, SurfaceString, Pos, Sentence};
 
@@ -38,64 +38,7 @@ pub fn import_file(db: &str, path: &str) {
 
 }
 
-pub fn list(db: &str, anki: bool, excluded: bool, learned: bool, order: &str, asc: bool, max: i32) {
+pub fn list(db: &str, in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, limit: i32) {
     let conn = Connection::open(db).expect("Cannot open a connection to the database");
-
-    let mut query = "SELECT expression FROM expressions ".to_string();
-
-    if !(anki && excluded && learned) {
-        query.push_str("WHERE ");
-
-        if !anki {
-            query.push_str("in_anki = 0 ");
-
-            if !excluded || !learned {
-                query.push_str("AND ");
-            }
-        }
-         
-        if !excluded {
-            query.push_str("is_excluded = 0 ");
-
-            if !learned {
-                query.push_str("AND ");
-            }
-        }
-
-        if !learned {
-            query.push_str("is_learned = 0 ");
-        }
-    }
-
-    match order {
-        "id" => query.push_str("id "),
-        "expression" => query.push_str("expression "),
-        _ => query.push_str("frequency ")
-    }
-
-    match asc {
-        true => query.push_str("ASC "),
-        false => query.push_str("DESC ")
-    }
-
-    if max > -1 {
-        query.push_str(&format!("LIMIT {}", max));
-    }
-
-    println!("{}", query);
-
-    let mut select_expression = conn.prepare(&query)
-        .expect("Unable to prepare select");
-
-    let expression_list = select_expression.query_map(params![], |row| {
-            let expression: String = row.get(0)?;
-            Ok(Expression::new(expression, None, None, None, None, None))
-            }).unwrap();
-
-    for expression in expression_list {
-        if let Ok(expression) = expression {
-            println!("{}", expression.get_expression());
-        }
-    }
-    
+    database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit);
 }

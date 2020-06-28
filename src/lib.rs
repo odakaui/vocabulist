@@ -3,11 +3,17 @@ mod data_types;
 mod tokenizer;
 
 use std::fs;
+use std::path::Path;
+
+use clap::{ArgMatches};
 
 use rusqlite::{Connection};
 
 use data_types::{Expression, SurfaceString, Pos, Sentence};
 
+pub struct Preference {
+    pub database_path: String,
+}
 
 /// Open a file and clean the contents
 fn open_file(path: &str) -> Vec<String> {
@@ -36,6 +42,28 @@ pub fn import_file(db: &str, path: &str) {
     
     database::insert_expression_list(&mut conn, expression_list);
 
+}
+
+pub fn import(p: Preference, m: &ArgMatches) {
+    let path =  Path::new(m.value_of("path").unwrap());
+    let database_path = p.database_path;
+
+    if path.is_dir() {
+        // Parse each file in the directory
+        for path in fs::read_dir(path).expect("Could not get file list") {
+            if let Ok(file) = path {
+                println!("Importing {}", &file.path().to_str().unwrap());
+                crate::import_file(&database_path, &file.path().to_str().unwrap());
+                println!("");
+            }
+        }
+    } else {
+        if let Some(file) = path.to_str() {
+            println!("Importing {}", file);
+            crate::import_file(&database_path, file);
+            println!("");
+        }
+    }
 }
 
 pub fn list(db: &str, in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, limit: i32) {

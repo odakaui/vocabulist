@@ -1,6 +1,3 @@
-use std::path::Path;
-use std::fs;
-
 use clap::{Arg, App, SubCommand};
 
 fn main() {
@@ -52,29 +49,12 @@ fn main() {
     
     
     let database_path = "/tmp/vocabulist_rs.db";
-    vocabulist_rs::initialize_database(database_path);
+    let p = vocabulist_rs::Preference { database_path: database_path.to_string() };
+
+    vocabulist_rs::initialize_database(&p.database_path);
 
     match match_list.subcommand() {
-        ("import", Some(sub_match_list)) => {
-            let path =  Path::new(sub_match_list.value_of("path").unwrap());
-
-            if path.is_dir() {
-                // Parse each file in the directory
-                for path in fs::read_dir(path).expect("Could not get file list") {
-                    if let Ok(file) = path {
-                        println!("Importing {}", &file.path().to_str().unwrap());
-                        vocabulist_rs::import_file(database_path, &file.path().to_str().unwrap());
-                        println!("");
-                    }
-                }
-            } else {
-                if let Some(file) = path.to_str() {
-                    println!("Importing {}", file);
-                    vocabulist_rs::import_file(database_path, file);
-                    println!("");
-                }
-            }
-        },
+        ("import", Some(m)) => vocabulist_rs::import(p, m),
         ("list", Some(sub_match_list)) => {
             println!("Listing Vocabulary");
             let max = sub_match_list.value_of("number").unwrap().parse::<i32>().unwrap();

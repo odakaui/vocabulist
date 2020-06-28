@@ -17,6 +17,12 @@ fn main() {
                                             .value_name("PATH")
                                             .required(true)
                                             .help("Import file/directory to database")))
+                            .subcommand(SubCommand::with_name("exclude")
+                                        .about("exclude expressions")
+                                        .arg(Arg::with_name("path")
+                                            .value_name("PATH")
+                                            .required(true)
+                                            .help("Path to file of words to exclude")))
                             .subcommand(SubCommand::with_name("list")
                                         .about("list vocabulary")
                                         .arg(Arg::with_name("number")
@@ -51,25 +57,10 @@ fn main() {
     let database_path = "/tmp/vocabulist_rs.db";
     let p = vocabulist_rs::Preference { database_path: database_path.to_string() };
 
-    vocabulist_rs::initialize_database(&p.database_path);
-
     match match_list.subcommand() {
         ("import", Some(m)) => vocabulist_rs::import(p, m),
-        ("list", Some(sub_match_list)) => {
-            println!("Listing Vocabulary");
-            let max = sub_match_list.value_of("number").unwrap().parse::<i32>().unwrap();
-            let is_asc = sub_match_list.is_present("asc");
-            let order_by = match sub_match_list.value_of("order") {
-                Some(order) => order,
-                None => "frequency"
-            };
-            let is_excluded = sub_match_list.is_present("excluded");
-            let in_anki = sub_match_list.is_present("anki");
-            let is_learned = sub_match_list.is_present("learned");
-
-            vocabulist_rs::list(database_path, in_anki, is_excluded, is_learned, order_by, is_asc, max);
-            println!("");
-        },
+        ("list", Some(m)) => vocabulist_rs::list(p, m),
+        ("exclude", Some(m)) => vocabulist_rs::exclude(p, m),
         _ => {},
     }
 }

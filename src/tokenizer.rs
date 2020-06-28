@@ -3,7 +3,7 @@ use std::io::Write;
 
 use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::{Expression, SurfaceString, Pos, Sentence};
+use crate::{Expression};
 
 /// Tokenize the sentences
 fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
@@ -26,17 +26,13 @@ fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
     let mut expression_list: Vec<Expression> = Vec::new();
     for token in token_list {
         if token[0] != "EOS" && token[0] != "@" && token[3] != "特殊" {
-            let surface_string = SurfaceString(vec![token[0].to_string()]);
-            let pos = Pos(vec![token[3].to_string()]);
-            let sentence = Sentence(vec![sentence.to_string()]);
-            let expression = Expression::new(
-                    token[2].to_string(),
-                    Some(pos),
-                    Some(sentence),
-                    Some(surface_string),
-                    None,
-                    None
-                    );
+            let surface_string = vec![token[0].to_string()];
+            let pos = vec![token[3].to_string()];
+            let sentence = vec![sentence.to_string()];
+            let expression = Expression::new(token[2].to_string())
+                .pos(pos)
+                .sentence(sentence)
+                .surface_string(surface_string);
 
             expression_list.push(expression);
         }

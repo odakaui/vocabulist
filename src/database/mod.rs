@@ -1,7 +1,18 @@
+mod query; 
+
+use std::error::Error;
+
 use rusqlite::{params, Connection};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Expression};
+
+pub fn connect(path: &str) -> Connection {
+    let conn = Connection::open(path).expect("Failed to connect to the database");
+    initialize_database(&conn);
+
+    conn
+}
 
 /// Initialize the database
 ///
@@ -10,9 +21,7 @@ use crate::{Expression};
 ///
 ///
 ///
-pub fn initialize_database(path: &str) {
-    let conn = Connection::open(path).expect("Cannot open a connection to the database");
-
+pub fn initialize_database(conn: &Connection) {
     conn.execute(
             "CREATE TABLE IF NOT EXISTS expressions (
                 id INTEGER PRIMARY KEY,
@@ -105,7 +114,7 @@ pub fn deduplicate_expression_list(conn: &Connection, sentence_list: Vec<String>
     for expression in expression_list.into_iter() {
         let mut is_duplicate = false;
         for duplicate_sentence in duplicate_sentence_list.iter() {
-            let sentence = &expression.get_sentence().as_ref().expect("sentence is required").0[0];
+            let sentence = &expression.get_sentence()[0];
             if sentence == duplicate_sentence {
                 is_duplicate = true;
                 break
@@ -139,9 +148,9 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
 
     for expression in pb.wrap_iter(expression_list.iter()) {
         let e: &str = expression.get_expression();
-        let pos = &expression.get_pos().as_ref().expect("pos is required").0[0];
-        let surface_string = &expression.get_surface_string().as_ref().expect("surface string is required").0[0];
-        let sentence = &expression.get_sentence().as_ref().expect("sentence is required").0[0];
+        let pos = &expression.get_pos()[0];
+        let surface_string = &expression.get_surface_string()[0];
+        let sentence = &expression.get_sentence()[0];
 
         tx.execute("INSERT OR IGNORE INTO expressions (expression) VALUES (?)
                     ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;", 
@@ -256,7 +265,7 @@ pub fn select_expression_list(conn: &Connection, in_anki: bool, is_excluded: boo
 
     let expression_list = select_expression.query_map(params![], |row| {
             let expression: String = row.get(0)?;
-            Ok(Expression::new(expression, None, None, None, None, None))
+            Ok(Expression::new(expression))
             }).unwrap();
 
     for expression in expression_list {
@@ -264,5 +273,19 @@ pub fn select_expression_list(conn: &Connection, in_anki: bool, is_excluded: boo
             println!("{}", expression.get_expression());
         }
     }
+}
+
+
+pub fn update_is_excluded(conn: &mut Connection, expression_list: Vec<Expression>, is_excluded: bool, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
+    let tx = conn.transaction()?;
+
+    for expression in expression_list {
+        query::expression::update_is_excluded(&tx, expression, is_excluded)?;
+        callback();
+    }
+
+    tx.commit()?;
+
+    Ok(())
 }
 

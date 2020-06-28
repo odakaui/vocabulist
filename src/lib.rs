@@ -1,5 +1,5 @@
 mod database;
-mod data_types;
+mod expression;
 mod tokenizer;
 
 use std::fs;
@@ -9,7 +9,9 @@ use clap::{ArgMatches};
 
 use rusqlite::{Connection};
 
-use data_types::{Expression, SurfaceString, Pos, Sentence};
+use indicatif::{ProgressBar, ProgressStyle};
+
+use expression::{Expression};
 
 pub struct Preference {
     pub database_path: String,
@@ -28,45 +30,86 @@ fn open_file(path: &str) -> Vec<String> {
     sentence_list
 }
 
-pub fn initialize_database(db: &str) {
-    database::initialize_database(db);
-}
-
-// Duplicate data check
-pub fn import_file(db: &str, path: &str) {
-    let mut conn = Connection::open(db).expect("Cannot open a connection to the database");
-
+fn import_file(conn: &mut Connection, path: &str) {
     let sentence_list = open_file(path);
     let expression_list = tokenizer::tokenize_sentence_list(&sentence_list);
     let expression_list = database::deduplicate_expression_list(&conn, sentence_list, expression_list);    
     
-    database::insert_expression_list(&mut conn, expression_list);
+    database::insert_expression_list(conn, expression_list);
 
 }
 
 pub fn import(p: Preference, m: &ArgMatches) {
+    // Initialize the database
+    let database_path = p.database_path.as_ref();
+    let mut conn = database::connect(database_path);
+
     let path =  Path::new(m.value_of("path").unwrap());
-    let database_path = p.database_path;
 
     if path.is_dir() {
         // Parse each file in the directory
         for path in fs::read_dir(path).expect("Could not get file list") {
             if let Ok(file) = path {
                 println!("Importing {}", &file.path().to_str().unwrap());
-                crate::import_file(&database_path, &file.path().to_str().unwrap());
+                crate::import_file(&mut conn, &file.path().to_str().unwrap());
                 println!("");
             }
         }
     } else {
         if let Some(file) = path.to_str() {
             println!("Importing {}", file);
-            crate::import_file(&database_path, file);
+            crate::import_file(&mut conn, file);
             println!("");
         }
     }
 }
 
-pub fn list(db: &str, in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, limit: i32) {
-    let conn = Connection::open(db).expect("Cannot open a connection to the database");
+pub fn list(p: Preference, m: &ArgMatches) {
+    // Initialize the database
+    let database_path = p.database_path.as_ref();
+    let conn = database::connect(database_path);
+
+    let in_anki     = m.is_present("anki");
+    let is_excluded = m.is_present("excluded");
+    let is_learned  = m.is_present("learned");
+    let order_by    = match m.value_of("order") {
+        Some(order) => order,
+        None => "frequency"
+    };
+    let is_asc      = m.is_present("asc");
+    let limit       = m.value_of("number").unwrap().parse::<i32>().unwrap();
+
     database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit);
+}
+
+fn build_progress_bar(len: u64) -> ProgressBar {
+    let pb = ProgressBar::new(len);
+    pb.set_message("Excluding");
+    pb.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.black} [{bar:40.black/black}] [{pos:>7}/{len:7}] {msg}")
+            .progress_chars("##-"));
+
+    pb
+}
+
+pub fn exclude(p: Preference, m: &ArgMatches) {
+    // Initialize the database
+    let database_path = p.database_path.as_ref();
+    let mut conn = database::connect(database_path);
+
+    match m.value_of("path") {
+        Some(path) => {
+            let file_content = fs::read_to_string(path).expect("Failed to open file");
+            let line_list = file_content.split_whitespace();
+            let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+            let len: u64 = expression_list.len() as u64;
+            let pb = build_progress_bar(len);
+
+            crate::database::update_is_excluded(&mut conn, expression_list, true, &|| pb.inc(1))
+                .expect("Failed to update database");
+
+            pb.finish_with_message("Excluded");
+        },
+        None => {},
+    }
 }

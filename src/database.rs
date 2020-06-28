@@ -11,7 +11,7 @@ pub fn initialize_database(path: &str) {
                 id INTEGER PRIMARY KEY,
                 expression TEXT NOT NULL UNIQUE,
                 frequency DEFAULT 1,
-                exclude INTEGER DEFAULT 0,
+                is_excluded INTEGER DEFAULT 0,
                 in_anki INTEGER NOT NULL DEFAULT 0,
                 is_learned INTEGER NOT NULL DEFAULT 0
                 );",

@@ -38,16 +38,51 @@ pub fn import_file(db: &str, path: &str) {
 
 }
 
-pub fn list(db: &str, max: i32) {
+pub fn list(db: &str, anki: bool, excluded: bool, learned: bool, order: &str, asc: bool, max: i32) {
     let conn = Connection::open(db).expect("Cannot open a connection to the database");
 
     let mut query = "SELECT expression FROM expressions ".to_string();
- 
-    query.push_str("ORDER BY frequency DESC ");
+
+    if !(anki && excluded && learned) {
+        query.push_str("WHERE ");
+
+        if !anki {
+            query.push_str("in_anki = 0 ");
+
+            if !excluded || !learned {
+                query.push_str("AND ");
+            }
+        }
+         
+        if !excluded {
+            query.push_str("is_excluded = 0 ");
+
+            if !learned {
+                query.push_str("AND ");
+            }
+        }
+
+        if !learned {
+            query.push_str("is_learned = 0 ");
+        }
+    }
+
+    match order {
+        "id" => query.push_str("id "),
+        "expression" => query.push_str("expression "),
+        _ => query.push_str("frequency ")
+    }
+
+    match asc {
+        true => query.push_str("ASC "),
+        false => query.push_str("DESC ")
+    }
 
     if max > -1 {
         query.push_str(&format!("LIMIT {}", max));
     }
+
+    println!("{}", query);
 
     let mut select_expression = conn.prepare(&query)
         .expect("Unable to prepare select");

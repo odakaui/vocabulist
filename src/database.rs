@@ -3,6 +3,74 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::{Expression};
 
+pub fn initialize_database(path: &str) {
+    let conn = Connection::open(path).expect("Cannot open a connection to the database");
+
+    conn.execute(
+            "CREATE TABLE IF NOT EXISTS expressions (
+                id INTEGER PRIMARY KEY,
+                expression TEXT NOT NULL UNIQUE,
+                frequency DEFAULT 1,
+                exclude INTEGER DEFAULT 0,
+                in_anki INTEGER NOT NULL DEFAULT 0,
+                is_learned INTEGER NOT NULL DEFAULT 0
+                );",
+            params![],
+            ).expect("Cannot create the 'expressions' table");
+
+    conn.execute(
+            "CREATE TABLE IF NOT EXISTS sentences (
+                id INTEGER PRIMARY KEY, 
+                sentence TEXT NOT NULL UNIQUE
+                );",
+            params![],
+            ).expect("Cannot create the 'sentences' table");
+
+    conn.execute(
+            "CREATE TABLE IF NOT EXISTS pos (
+                id INTEGER PRIMARY KEY, 
+                pos TEXT NOT NULL UNIQUE, 
+                is_excluded INTEGER NOT NULL DEFAULT 0
+                );",
+            params![],
+            ).expect("Cannot create the 'pos' table.");
+
+    conn.execute(
+            "CREATE TABLE IF NOT EXISTS surface_strings (
+                id INTEGER PRIMARY KEY, 
+                surface_string TEXT NOT NULL UNIQUE
+                );",
+            params![],
+            ).expect("Cannot create the 'surface_strings' table");
+
+    conn.execute(
+            "CREATE TABLE IF NOT EXISTS expressions_pos_sentences_surface_strings (
+                pos_id INTEGER, 
+                sentence_id INTEGER, 
+                expression_id INTEGER, 
+                surface_string_id INTEGER, 
+                PRIMARY KEY (pos_id, sentence_id, expression_id, surface_string_id), 
+                    FOREIGN KEY (sentence_id) 
+                        REFERENCES sentences (id) 
+                            ON DELETE CASCADE
+                            ON UPDATE NO ACTION,
+                    FOREIGN KEY (expression_id)
+                        REFERENCES expressions (id)
+                            ON DELETE CASCADE
+                            ON UPDATE NO ACTION,
+                    FOREIGN KEY (pos_id)
+                        REFERENCES pos (id)
+                            ON DELETE CASCADE
+                            ON UPDATE NO ACTION,
+                    FOREIGN KEY (surface_string_id)
+                        REFERENCES surface_strings (id)
+                            ON DELETE CASCADE
+                            ON UPDATE NO ACTION
+                );",
+            params![],
+            ).expect("Cannot create the 'pos_sentences_sstrings_words' table");
+}
+
 pub fn deduplicate_expression_list(conn: &Connection, sentence_list: Vec<String>, expression_list: Vec<Expression>) -> Vec<Expression> {
     let mut duplicate_sentence_list: Vec<String> = Vec::new();
     for sentence in sentence_list.iter() {
@@ -101,72 +169,5 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
     tx.commit().expect("Unable to commit transaction");
 
     pb.finish_with_message("Imported");
-}
-pub fn initialize_database(path: &str) {
-    let conn = Connection::open(path).expect("Cannot open a connection to the database");
-
-    conn.execute(
-            "CREATE TABLE IF NOT EXISTS expressions (
-                id INTEGER PRIMARY KEY,
-                expression TEXT NOT NULL UNIQUE,
-                frequency DEFAULT 1,
-                exclude INTEGER DEFAULT 0,
-                in_anki INTEGER NOT NULL DEFAULT 0,
-                is_learned INTEGER NOT NULL DEFAULT 0
-                );",
-            params![],
-            ).expect("Cannot create the 'expressions' table");
-
-    conn.execute(
-            "CREATE TABLE IF NOT EXISTS sentences (
-                id INTEGER PRIMARY KEY, 
-                sentence TEXT NOT NULL UNIQUE
-                );",
-            params![],
-            ).expect("Cannot create the 'sentences' table");
-
-    conn.execute(
-            "CREATE TABLE IF NOT EXISTS pos (
-                id INTEGER PRIMARY KEY, 
-                pos TEXT NOT NULL UNIQUE, 
-                is_excluded INTEGER NOT NULL DEFAULT 0
-                );",
-            params![],
-            ).expect("Cannot create the 'pos' table.");
-
-    conn.execute(
-            "CREATE TABLE IF NOT EXISTS surface_strings (
-                id INTEGER PRIMARY KEY, 
-                surface_string TEXT NOT NULL UNIQUE
-                );",
-            params![],
-            ).expect("Cannot create the 'surface_strings' table");
-
-    conn.execute(
-            "CREATE TABLE IF NOT EXISTS expressions_pos_sentences_surface_strings (
-                pos_id INTEGER, 
-                sentence_id INTEGER, 
-                expression_id INTEGER, 
-                surface_string_id INTEGER, 
-                PRIMARY KEY (pos_id, sentence_id, expression_id, surface_string_id), 
-                    FOREIGN KEY (sentence_id) 
-                        REFERENCES sentences (id) 
-                            ON DELETE CASCADE
-                            ON UPDATE NO ACTION,
-                    FOREIGN KEY (expression_id)
-                        REFERENCES expressions (id)
-                            ON DELETE CASCADE
-                            ON UPDATE NO ACTION,
-                    FOREIGN KEY (pos_id)
-                        REFERENCES pos (id)
-                            ON DELETE CASCADE
-                            ON UPDATE NO ACTION,
-                    FOREIGN KEY (surface_string_id)
-                        REFERENCES surface_strings (id)
-                            ON DELETE CASCADE
-                            ON UPDATE NO ACTION
-                );",
-            params![],
-            ).expect("Cannot create the 'pos_sentences_sstrings_words' table");
 }
 

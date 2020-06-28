@@ -4,7 +4,7 @@ mod tokenizer;
 
 use std::fs;
 
-use rusqlite::{Connection};
+use rusqlite::{Connection, params};
 
 use data_types::{Expression, SurfaceString, Pos, Sentence};
 
@@ -36,4 +36,23 @@ pub fn import_file(db: &str, path: &str) {
     
     database::insert_expression_list(&mut conn, expression_list);
 
+}
+
+pub fn list(db: &str) {
+    let conn = Connection::open(db).expect("Cannot open a connection to the database");
+
+    let mut select_expression = conn.prepare("SELECT expression FROM expressions ORDER BY expression ASC;")
+        .expect("Unable to prepare select");
+
+    let expression_list = select_expression.query_map(params![], |row| {
+            let expression: String = row.get(0)?;
+            Ok(Expression::new(expression, None, None, None, None, None))
+            }).unwrap();
+
+    for expression in expression_list {
+        if let Ok(expression) = expression {
+            println!("{}", expression.get_expression());
+        }
+    }
+    
 }

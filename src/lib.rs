@@ -1,6 +1,7 @@
 mod database;
 mod expression;
 mod tokenizer;
+mod progress_bar;
 
 use std::fs;
 use std::path::Path;
@@ -8,8 +9,6 @@ use std::path::Path;
 use clap::{ArgMatches};
 
 use rusqlite::{Connection};
-
-use indicatif::{ProgressBar, ProgressStyle};
 
 use expression::{Expression};
 
@@ -82,34 +81,21 @@ pub fn list(p: Preference, m: &ArgMatches) {
     database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit);
 }
 
-fn build_progress_bar(len: u64) -> ProgressBar {
-    let pb = ProgressBar::new(len);
-    pb.set_message("Excluding");
-    pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.black} [{bar:40.black/black}] [{pos:>7}/{len:7}] {msg}")
-            .progress_chars("##-"));
-
-    pb
-}
-
 pub fn exclude(p: Preference, m: &ArgMatches) {
     // Initialize the database
     let database_path = p.database_path.as_ref();
     let mut conn = database::connect(database_path);
 
-    match m.value_of("path") {
-        Some(path) => {
+    if let Some(path) = m.value_of("path") {
             let file_content = fs::read_to_string(path).expect("Failed to open file");
             let line_list = file_content.split_whitespace();
             let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
             let len: u64 = expression_list.len() as u64;
-            let pb = build_progress_bar(len);
+            let pb = progress_bar::new(len);
 
             crate::database::update_is_excluded(&mut conn, expression_list, true, &|| pb.inc(1))
                 .expect("Failed to update database");
 
             pb.finish_with_message("Excluded");
-        },
-        None => {},
     }
 }

@@ -1,5 +1,4 @@
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Expression {
     expression: String,
     pos: Vec<String>,

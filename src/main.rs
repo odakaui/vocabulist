@@ -1,6 +1,7 @@
+use std::error::Error;
 use clap::{Arg, App, SubCommand};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let match_list = App::new("Vocabulist")
                             .version("0.1")
                             .author("Odaka Ui <odakaui@example.com>")
@@ -29,6 +30,13 @@ fn main() {
                                             .value_name("PATH")
                                             .required(true)
                                             .help("Path to file of words to include")))
+                            .subcommand(SubCommand::with_name("generate")
+                                        .about("generate flashcards")
+                                        .arg(Arg::with_name("number")
+                                            .value_name("NUM")
+                                            .required(false)
+                                            .default_value("10")
+                                            .help("Number of flashcards to generate")))
                             .subcommand(SubCommand::with_name("list")
                                         .about("list vocabulary")
                                         .arg(Arg::with_name("number")
@@ -61,13 +69,20 @@ fn main() {
     
     
     let database_path = "/tmp/vocabulist_rs.db";
-    let p = vocabulist_rs::Preference { database_path: database_path.to_string() };
+    let dictionary_path = "jmdict.db";
+    let p = vocabulist_rs::Preference {
+        database_path: database_path.to_string(),
+        dictionary_path: dictionary_path.to_string()
+    };
 
     match match_list.subcommand() {
         ("import", Some(m)) => vocabulist_rs::import(p, m),
         ("list", Some(m)) => vocabulist_rs::list(p, m),
         ("exclude", Some(m)) => vocabulist_rs::exclude(p, m),
         ("include", Some(m)) => vocabulist_rs::include(p, m),
-        _ => {},
-    }
+        ("generate", Some(m)) => vocabulist_rs::generate(p, m),
+        _ => Ok(()),
+    }?;
+
+    Ok(())
 }

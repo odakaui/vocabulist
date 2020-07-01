@@ -30,5 +30,3 @@ pub fn select_id(tx: &Transaction, string: &str) -> Result<i32, Box<dyn Error>> 
 
     Ok(id)
 }
-
-query_function!(select_is_excluded, Transaction, "SELECT is_excluded FROM expressions WHERE expression = ?;");

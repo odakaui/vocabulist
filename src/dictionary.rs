@@ -73,10 +73,7 @@ pub fn select_definition_for_expression(conn: &Connection, expression: &str) -> 
             .map(|x| x.unwrap())
             .collect();
 
-        definition_list.push(DictionaryDefinition {
-            definition_list: gloss_list,
-            pos_list: pos_list
-            });
+        definition_list.push(DictionaryDefinition::new(gloss_list, pos_list));
     }
 
     Ok((definition_list, is_specific))

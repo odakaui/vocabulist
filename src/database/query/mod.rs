@@ -1,20 +1,6 @@
 use std::error::Error;
 use rusqlite::{Transaction, params};
 
-#[macro_use]
-macro_rules! query_function {
-    ($i:ident, $item:ident, $query:expr) => {
-        pub fn $i(conn: &$item, string:&str) -> Result<(), Box<dyn Error>> {
-            let params = params![string];
-            let query = $query;
-
-            conn.execute(query, params)?;
-
-            Ok(())
-        }
-    }
-}
-
 pub mod expression;
 pub mod pos;
 pub mod sentence;

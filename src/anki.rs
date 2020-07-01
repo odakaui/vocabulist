@@ -1,72 +1,6 @@
 use std::error::Error;
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use crate::Preference;
-
-// #[derive(Serialize, Deserialize)]
-// struct Note {
-//     deckName: String,
-//     modelName: String,
-//     fields: Fields,
-//     options: Options,
-//     tags: Vec<String>,
-//     audio: Option<Vec<Audio>>,
-// }
-// 
-// impl Note {
-//     fn new(fields: Fields, options: Options, audio: Option<Vec<Audio>>) -> Note {
-//         Note {
-//             deckName: "Default".to_string(),
-//             modelName: "Vocabulist".to_string(),
-//             fields,
-//             options,
-//             tags: vec!["vocabulist".to_string()],
-//             audio,
-//         }
-//     }
-// }
-// 
-// #[derive(Serialize, Deserialize)]
-// struct Audio {
-//     url: String,
-//     filename: String,
-//     skipHash: String,
-//     fields: Vec<String>
-// }
-// 
-// #[derive(Serialize, Deserialize)]
-// struct Options {
-//     allowDuplicate: bool,
-//     duplicateScope: String,
-// }
-// 
-// impl Options {
-//     fn new() -> Options {
-//         Options {
-//             allowDuplicate: false,
-//             duplicateScope: "deck".to_string()
-//         }
-//     }
-// }
-// 
-// #[derive(Serialize, Deserialize)]
-// struct Fields {
-//     Definition: String,
-//     Expression: String,
-//     Reading: String,
-//     Sentence: String
-// }
-// 
-// impl Fields {
-//     fn new(definition: String, expression: String, reading: String, sentence: String) -> Fields {
-//         Fields {
-//             Definition: definition,
-//             Expression: expression,
-//             Reading: reading,
-//             Sentence: sentence
-//         }
-//     }
-// }
 
 fn request(action: String, params: Value) -> Value {
     json!({"action": action, "params": params, "version": 6})
@@ -83,47 +17,96 @@ fn invoke(action: String, params: Value) -> Result<Value, Box<dyn Error>> {
 
     let response = serde_json::from_str(&response)?;
 
+    // @TODO error handling
+
     Ok(response)
 }
 
-pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<String> {
-    let mut url_list = Vec::new();
-    for reading in reading_list.iter() {
+fn url_for_expression(expression: &str, reading: &str) -> (String, String) {
         let url_string = format!("https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={}&kana={}", expression, reading);
-        
-        url_list.push(url_string);
+        let file_string = format!("vocabulist_{}_{}", expression, reading);
+
+        (url_string, file_string)
+}
+
+pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(String, String)> {
+    let mut url_list: Vec<(String, String)> = Vec::new();
+    match reading_list.len() {
+        0 => url_list.push(url_for_expression(expression, expression)),
+        _ => {
+            for reading in reading_list.iter() {
+                url_list.push(url_for_expression(expression, reading));
+            }
+        }
     }
 
     url_list
 }
 
-pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<String>) -> Result<(), Box<dyn Error>> {
-    let params = json!({
-            "note": {
-                "deckName": "Default",
-                "modelName": "Vocabulist",
-                "fields": {
-                    "Definition": definition,
-                    "Expression": expression,
-                    "Reading": reading,
-                    "Sentence": sentence,
-                },
-                "options": {
-                    "allowDuplicate": false,
-                    "duplicateScope": "deck"
-                },
-                "tags": [
-                    "vocabulist"
-                ],
-            }
+pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Result<(), Box<dyn Error>> {
+    let deck_name = "Default";
+    let model_name = "Vocabulist";
+
+    let fields = json!({
+            "Definition": definition,
+            "Expression": expression,
+            "Reading": reading,
+            "Sentence": sentence,
         });
 
-    let response = invoke("addNote".to_string(), params)?;
+    let options = json!({
+            "allowDuplicate": false,
+            "duplicateScope": "deck",
+        });
+    
+    let tags = vec!["vocabulist"];
 
-    println!("{}", response);
+    let audio_field_list = vec!["Audio"];
+    
+    let params = match p.audio {
+        false => {
+            json!({
+                    "note": {
+                        "deckName": deck_name,
+                        "modelName": model_name,
+                        "fields": fields,
+                        "options": options,
+                        "tags": tags,
+                    }
+                })
+        },
+        true => {
+            let mut audio_list: Vec<Value> = Vec::new();
+            for (url, file_name) in url_list.iter() {
+                let audio = json!({
+                        "url": url,
+                        "filename": file_name,
+                        "skipHash": "7e2c2f954ef6051373ba916f000168dc",
+                        "fields": audio_field_list
+                    });
+
+                audio_list.push(audio);
+            }
+
+            json!({
+                    "note": {
+                        "deckName": deck_name,
+                        "modelName": model_name,
+                        "fields": fields,
+                        "options": options,
+                        "tags": tags,
+                        "audio": audio_list
+                    }
+                })
+        },
+    };
+
+    invoke("addNote".to_string(), params)?;
 
     Ok(())
 
+        
 
 
 }
+

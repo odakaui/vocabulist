@@ -72,7 +72,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dictionary_path = "jmdict.db";
     let p = vocabulist_rs::Preference {
         database_path: database_path.to_string(),
-        dictionary_path: dictionary_path.to_string()
+        dictionary_path: dictionary_path.to_string(),
+        audio: true
     };
 
     match match_list.subcommand() {

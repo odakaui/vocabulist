@@ -33,6 +33,86 @@ fn open_file(path: &str) -> Vec<String> {
     sentence_list
 }
 
+fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_definition: bool, is_specific_kanji: bool) -> String {
+    let mut definition_string = String::new();
+    
+    if !is_specific_definition {
+        definition_string.push_str("WARNING: Definition is not filtered.<br>\n");
+    }
+
+    if !is_specific_kanji {
+        definition_string.push_str("WARNING: Not filtered by kanji. <br>\n");
+    }
+
+    definition_string.push_str("<ol>\n");
+    for definition in definition_list.iter() {
+        definition_string.push_str(" <li>");
+        for (i, d) in definition.iter().enumerate() {
+            match i {
+                0 => definition_string.push_str(d),
+                _ => definition_string.push_str(&format!("; {}", d))
+            }; 
+        }
+        definition_string.push_str("</li>\n");
+    }
+    definition_string.push_str("</ol>");
+
+    definition_string
+}
+
+fn format_anki_reading(reading_list: &Vec<String>) -> String {
+    let mut reading_string = String::new();
+    for (i, reading) in reading_list.iter().enumerate() {
+        match i {
+            0 => reading_string.push_str(reading),
+            _ => reading_string.push_str(&format!("; {}", reading))
+        };
+    }
+
+    reading_string
+}
+
+fn format_anki_sentence(sentence_list: &Vec<String>) -> String {
+    sentence_list[0].to_string()
+}
+
+fn create_flashcards_from_expression_list(p: Preference, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32) -> Result<(), Box<dyn Error>> {
+    let mut i = 0;
+    for expression in expression_list.iter() {
+        let expression_string = &expression.get_expression();
+
+        let (definition_list, is_specific_kanji) = dictionary::select_definition_for_expression(&dict, expression_string)?;
+        let pos_list = database::select_pos_for_expression(&conn, expression_string)?;
+        let reading_list = dictionary::select_reading_for_expression(&dict, expression_string)?;
+        let sentence_list = database::select_sentence_for_expression(&conn, expression_string)?;
+
+        if definition_list.len() == 0 {
+            database::update_is_excluded(conn, &vec![expression.clone()], true, &|| {})?;
+            continue
+        }
+
+        let (definition_list, is_specific_definition) = dictionary::filter_definition_with_pos_list(&definition_list, &posconverter::convert_pos_list(&pos_list));
+
+        // remove duplicate entries
+        let definition_list = definition_list.into_iter().unique().collect();
+
+        let definition_string = format_anki_definition(&definition_list, is_specific_definition, is_specific_kanji);
+        let expression_string = expression.get_expression();
+        let reading_string = format_anki_reading(&reading_list);
+        let sentence_string = format_anki_sentence(&sentence_list);
+        let url_list = anki::create_url_list(expression_string, &reading_list);
+
+        anki::insert_note(&p, &definition_string, &expression_string, &reading_string, &sentence_string, &url_list)?;
+        database::update_in_anki_for_expression(conn, 1u32, expression_string)?;
+
+        i += 1;
+
+        if i >= max { break }
+    }
+
+    Ok(())
+}
+
 pub fn import(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path.as_ref();
@@ -137,86 +217,6 @@ pub fn include(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
                 .expect("Failed to update database");
 
             pb.finish_with_message("Included");
-    }
-
-    Ok(())
-}
-
-fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_definition: bool, is_specific_kanji: bool) -> String {
-    let mut definition_string = String::new();
-    
-    if !is_specific_definition {
-        definition_string.push_str("WARNING: Definition is not filtered.<br>\n");
-    }
-
-    if !is_specific_kanji {
-        definition_string.push_str("WARNING: Not filtered by kanji. <br>\n");
-    }
-
-    definition_string.push_str("<ol>\n");
-    for definition in definition_list.iter() {
-        definition_string.push_str(" <li>");
-        for (i, d) in definition.iter().enumerate() {
-            match i {
-                0 => definition_string.push_str(d),
-                _ => definition_string.push_str(&format!("; {}", d))
-            }; 
-        }
-        definition_string.push_str("</li>\n");
-    }
-    definition_string.push_str("</ol>");
-
-    definition_string
-}
-
-fn format_anki_reading(reading_list: &Vec<String>) -> String {
-    let mut reading_string = String::new();
-    for (i, reading) in reading_list.iter().enumerate() {
-        match i {
-            0 => reading_string.push_str(reading),
-            _ => reading_string.push_str(&format!("; {}", reading))
-        };
-    }
-
-    reading_string
-}
-
-fn format_anki_sentence(sentence_list: &Vec<String>) -> String {
-    sentence_list[0].to_string()
-}
-
-fn create_flashcards_from_expression_list(p: Preference, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32) -> Result<(), Box<dyn Error>> {
-    let mut i = 0;
-    for expression in expression_list.iter() {
-        let expression_string = &expression.get_expression();
-
-        let (definition_list, is_specific_kanji) = dictionary::select_definition_for_expression(&dict, expression_string)?;
-        let pos_list = database::select_pos_for_expression(&conn, expression_string)?;
-        let reading_list = dictionary::select_reading_for_expression(&dict, expression_string)?;
-        let sentence_list = database::select_sentence_for_expression(&conn, expression_string)?;
-
-        if definition_list.len() == 0 {
-            database::update_is_excluded(conn, &vec![expression.clone()], true, &|| {})?;
-            continue
-        }
-
-        let (definition_list, is_specific_definition) = dictionary::filter_definition_with_pos_list(&definition_list, &posconverter::convert_pos_list(&pos_list));
-
-        // remove duplicate entries
-        let definition_list = definition_list.into_iter().unique().collect();
-
-        let definition_string = format_anki_definition(&definition_list, is_specific_definition, is_specific_kanji);
-        let expression_string = expression.get_expression();
-        let reading_string = format_anki_reading(&reading_list);
-        let sentence_string = format_anki_sentence(&sentence_list);
-        let url_list = anki::create_url_list(expression_string, &reading_list);
-
-        anki::insert_note(&p, &definition_string, &expression_string, &reading_string, &sentence_string, &url_list)?;
-        database::update_in_anki_for_expression(conn, 1u32, expression_string)?;
-
-        i += 1;
-
-        if i >= max { break }
     }
 
     Ok(())

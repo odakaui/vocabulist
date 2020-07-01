@@ -29,21 +29,7 @@ fn url_for_expression(expression: &str, reading: &str) -> (String, String) {
         (url_string, file_string)
 }
 
-pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(String, String)> {
-    let mut url_list: Vec<(String, String)> = Vec::new();
-    match reading_list.len() {
-        0 => url_list.push(url_for_expression(expression, expression)),
-        _ => {
-            for reading in reading_list.iter() {
-                url_list.push(url_for_expression(expression, reading));
-            }
-        }
-    }
-
-    url_list
-}
-
-pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Result<(), Box<dyn Error>> {
+fn create_note(p: &Preference, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Value {
     let deck_name = "Default";
     let model_name = "Vocabulist";
 
@@ -62,8 +48,8 @@ pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: 
     let tags = vec!["vocabulist"];
 
     let audio_field_list = vec!["Audio"];
-    
-    let params = match p.audio {
+
+    match p.audio {
         false => {
             json!({
                     "note": {
@@ -99,8 +85,25 @@ pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: 
                     }
                 })
         },
-    };
+    }
+}
 
+pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(String, String)> {
+    let mut url_list: Vec<(String, String)> = Vec::new();
+    match reading_list.len() {
+        0 => url_list.push(url_for_expression(expression, expression)),
+        _ => {
+            for reading in reading_list.iter() {
+                url_list.push(url_for_expression(expression, reading));
+            }
+        }
+    }
+
+    url_list
+}
+
+pub fn insert_note(p: &Preference, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Result<(), Box<dyn Error>> {
+    let params = create_note(p, definition, expression, reading, sentence, url_list);
     invoke("addNote".to_string(), params)?;
 
     Ok(())

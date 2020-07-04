@@ -47,6 +47,12 @@ fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &s
     verify_fields(field_list);
     let field_value_iter = field_list[0].iter().zip(field_list[1].iter());
 
+    // if the reading is blank, set reading to equal expression
+    let mut reading = reading;
+    if reading == "" {
+        reading = expression;
+    }
+
     let mut audio_field_list: Vec<String> = Vec::new();
     let mut field_map: HashMap<String, String> = HashMap::new(); 
     for (f, v) in field_value_iter {
@@ -222,4 +228,63 @@ pub fn expression_list(p: &Config) -> Result<Vec<String>, Box<dyn Error>> {
     let expression_list = expression_list_for_info_list(&p, &info_list)?;
 
     Ok(expression_list)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn field_map(definition: String, expression: String, reading: String, sentence: String) -> Value {
+        let mut field_map: HashMap<String, String> = HashMap::new();
+        
+        field_map.insert("Expression".to_string(), expression);
+        field_map.insert("Reading".to_string(), reading);
+        field_map.insert("Definition".to_string(), definition);
+        field_map.insert("Sentence".to_string(), sentence);
+
+        json!(field_map)
+    }
+
+    #[test]
+    fn create_fields_all_information() {
+        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+
+        let expression = "塩".to_string();
+        let reading = "しお".to_string();
+        let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
+        let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
+
+        let fields = field_map(definition.clone(), expression.clone(), reading.clone(), sentence.clone());
+
+        assert_eq!(create_fields(&field_list, &definition, &expression, &reading, &sentence), fields);
+    }
+
+    #[test]
+    fn create_fields_no_reading() {
+        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+
+        let expression = "塩".to_string();
+        let reading = "".to_string();
+        let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
+        let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
+
+        let fields = field_map(definition.clone(), expression.clone(), expression.clone(), sentence.clone());
+
+        assert_eq!(create_fields(&field_list, &definition, &expression, &reading, &sentence), fields);
+    }
+
+    #[test]
+    #[should_panic]
+    fn create_fields_should_panic() {
+        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+
+        let expression = "塩".to_string();
+        let reading = "しお".to_string();
+        let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
+        let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
+
+        let fields = field_map(definition.clone(), expression.clone(), reading.clone(), sentence.clone());
+
+        assert_eq!(create_fields(&field_list, "", "", "", ""), fields);
+    }
 }

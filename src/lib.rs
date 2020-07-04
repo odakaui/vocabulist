@@ -141,7 +141,7 @@ fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_defini
     let mut definition_string = String::new();
     
     if !is_specific_definition {
-        definition_string.push_str("WARNING: Definition is not filtered.<br>\n");
+        definition_string.push_str("WARNING: Not filtered by pos.<br>\n");
     }
 
     if !is_specific_kanji {

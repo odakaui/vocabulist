@@ -30,14 +30,7 @@ fn url_for_expression(expression: &str, reading: &str) -> (String, String) {
         (url_string, file_string)
 }
 
-fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Value {
-    let anki = p.anki();
-    let deck_name = anki.deck_name();
-    let model_name = anki.model_name();
-
-    // todo parse note fields from config object
-    let field_list = anki.fields();
-
+fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &str, reading: &str, sentence: &str) -> Value {
     if field_list.len() != 2 {
         panic!("The configuration data either the fields array or values array is missing.");
     }
@@ -68,54 +61,81 @@ fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, se
         field_map.insert(f.to_string(), value.to_string());
     }
 
-    let fields = json!(field_map);
+    json!(field_map)
+}
 
-    let options = json!({
-            "allowDuplicate": anki.allow_duplicates(),
-            "duplicateScope": anki.duplicate_scope(),
-        });
-    
-    let tags = anki.tags();
+fn create_options(allow_duplicates: bool, duplicate_scope: String) -> Value {
+    json!({
+            "allowDuplicate": allow_duplicates,
+            "duplicateScope": duplicate_scope,
+    })
+}
 
-    let audio_field_list = audio_field_list;
-
-    match p.anki().audio() {
-        false => {
-            json!({
-                    "note": {
-                        "deckName": deck_name,
-                        "modelName": model_name,
-                        "fields": fields,
-                        "options": options,
-                        "tags": tags,
-                    }
-                })
-        },
-        true => {
-            let mut audio_list: Vec<Value> = Vec::new();
-            for (url, file_name) in url_list.iter() {
-                let audio = json!({
-                        "url": url,
-                        "filename": file_name,
-                        "skipHash": "7e2c2f954ef6051373ba916f000168dc",
-                        "fields": audio_field_list
-                    });
-
-                audio_list.push(audio);
-            }
-
-            json!({
-                    "note": {
-                        "deckName": deck_name,
-                        "modelName": model_name,
-                        "fields": fields,
-                        "options": options,
-                        "tags": tags,
-                        "audio": audio_list
-                    }
-                })
-        },
+fn create_audio_fields(field_list: &Vec<Vec<String>>) -> Value {
+    if field_list.len() != 2 {
+        panic!("The configuration data either the fields array or values array is missing.");
     }
+
+    let fields = &field_list[0];
+    let values = &field_list[1];
+
+    if fields.len() != values.len() {
+        panic!("The configuration data is invalid the fields and values array are not the same length.");
+    }
+
+    let field_value_iter = fields.iter().zip(values.iter());
+    let mut audio_field_list: Vec<String> = Vec::new();
+    for (f, v) in field_value_iter {
+        if v.to_lowercase() == "audio" {
+            audio_field_list.push(f.to_string());
+        }
+    }
+
+    json!(audio_field_list)
+}
+
+fn create_audio_list(audio_fields: &Value, url_list: &Vec<(String, String)>) -> Vec<Value> {
+    let mut audio_list: Vec<Value> = Vec::new();
+    for (url, file_name) in url_list.iter() {
+        let audio = json!({
+                "url": url,
+                "filename": file_name,
+                "skipHash": "7e2c2f954ef6051373ba916f000168dc",
+                "fields": audio_fields
+            });
+
+        audio_list.push(audio);
+    }
+
+    audio_list
+}
+
+fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Value {
+    let anki = p.anki();
+    let field_list = anki.fields();
+
+    let deck_name = anki.deck_name();
+    let model_name = anki.model_name();
+    let fields = create_fields(field_list, definition, expression, reading, sentence);
+    let options = create_options(anki.allow_duplicates(), anki.duplicate_scope().to_string());
+    let tags = anki.tags();
+    let audio_fields = create_audio_fields(field_list);
+    let mut audio_list: Vec<Value> = Vec::new();
+
+    if anki.audio() {
+        audio_list = create_audio_list(&audio_fields, url_list);
+    }
+
+    json!({
+            "note": {
+                "deckName": deck_name,
+                "modelName": model_name,
+                "fields": fields,
+                "options": options,
+                "tags": tags,
+                "audio": audio_list
+            }
+    })
 }
 
 pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(String, String)> {

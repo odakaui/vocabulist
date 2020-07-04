@@ -250,6 +250,31 @@ pub fn select_sentence_for_expression(conn: &Connection, expression: &str) -> Re
     Ok(sentence_list)
 }
 
+pub fn select_pos_list(conn: &Connection, is_excluded: bool, is_asc: bool, limit: i32) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut query = "SELECT pos FROM pos ".to_string();
+
+    if !is_excluded {
+        query.push_str("WHERE is_excluded = 0 ");
+    }
+
+    match is_asc {
+        true => query.push_str("ORDER BY pos ASC "),
+        false => query.push_str("ORDER BY pos DESC ")
+    }
+
+    if limit > -1 {
+        query.push_str(&format!("LIMIT {}", limit)[..]);
+    }
+
+    let mut statement = conn.prepare(&query)?;
+
+    let pos_list: Vec<String> = statement.query_map(params![], |row| Ok(row.get(0)?))?
+        .map(|x| x.unwrap())
+        .collect();
+
+    Ok(pos_list)
+}
+
 sql!(update_in_anki_for_expression, UPDATE_IN_ANKI_FOR_EXPRESSION, params=[conn: &Connection, in_anki: u32, expression: &str]);
 
 sql!(reset_in_anki, RESET_IN_ANKI, params=[conn: &Connection]);

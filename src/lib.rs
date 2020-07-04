@@ -275,21 +275,36 @@ pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let database_path = p.database_path();
     let conn = database::connect(database_path);
 
-    let in_anki     = m.is_present("anki");
-    let is_excluded = m.is_present("excluded");
-    let is_learned  = m.is_present("learned");
-    let order_by    = match m.value_of("order") {
-        Some(order) => order,
-        None => "frequency"
-    };
-    let is_asc      = m.is_present("asc");
-    let limit       = m.value_of("number").unwrap().parse::<i32>().unwrap();
+    match m.is_present("pos") {
+        true => {
+            let is_excluded = m.is_present("excluded");
+            let is_asc = m.is_present("asc");
+            let limit =  m.value_of("number").unwrap().parse::<i32>().unwrap();
 
-    let expression_list = database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit)
-        .expect("Failed to get expressions from database");
+            let pos_list = database::select_pos_list(&conn, is_excluded, is_asc, limit)?;
 
-    for expression in expression_list {
-        println!("{}", expression.get_expression());
+            for pos in pos_list {
+                println!("{}", pos);
+            }
+        },
+        false => {
+            let in_anki     = m.is_present("anki");
+            let is_excluded = m.is_present("excluded");
+            let is_learned  = m.is_present("learned");
+            let order_by    = match m.value_of("order") {
+                Some(order) => order,
+                None => "frequency"
+            };
+            let is_asc      = m.is_present("asc");
+            let limit       = m.value_of("number").unwrap().parse::<i32>().unwrap();
+
+            let expression_list = database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit)
+                .expect("Failed to get expressions from database");
+
+            for expression in expression_list {
+                println!("{}", expression.get_expression());
+            }
+        }
     }
 
     Ok(())

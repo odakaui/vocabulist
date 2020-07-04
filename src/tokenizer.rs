@@ -1,8 +1,6 @@
 use std::process::{Command, Stdio};
 use std::io::Write;
 
-use indicatif::{ProgressBar, ProgressStyle};
-
 use crate::{Expression};
 
 /// Tokenize the sentences
@@ -42,20 +40,14 @@ fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
 }
 
 /// Wrapper for Tokenize sentences
-pub fn tokenize_sentence_list(sentence_list: &Vec<String>) -> Vec<Expression> {
-    let pb = ProgressBar::new(sentence_list.len() as u64);
-    pb.set_message("Tokenizing");
-    pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.black} [{bar:40.black/black}] [{pos:>7}/{len:7}] {msg}")
-            .progress_chars("##-"));
-
+pub fn tokenize_sentence_list(sentence_list: &Vec<String>, callback: &dyn Fn()) -> Vec<Expression> {
     let mut expression_list: Vec<Expression> = Vec::new();
-    for sentence in pb.wrap_iter(sentence_list.iter()) {
+    for sentence in sentence_list.iter() {
         let e = tokenize_sentence(sentence);
         expression_list.extend(e);
-    }
 
-    pb.finish_with_message("Tokenized");
+        callback();
+    }
 
     expression_list
 }

@@ -184,7 +184,7 @@ fn format_anki_sentence(sentence_list: &Vec<String>) -> String {
     sentence_list[0].to_string()
 }
 
-fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32) -> Result<(), Box<dyn Error>> {
+fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
     let mut i = 0;
     for expression in expression_list.iter() {
         let expression_string = &expression.get_expression();
@@ -216,6 +216,8 @@ fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict
         i += 1;
 
         if i >= max { break }
+
+        callback();
     }
 
     Ok(())
@@ -230,13 +232,18 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     fn import_file(conn: &mut Connection, path: &str) {
         let sentence_list = open_file(path);
-        let expression_list = tokenizer::tokenize_sentence_list(&sentence_list);
-        let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
-            .expect("Failed to get sentences from database");
-        let expression_list = database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);    
-        let len = expression_list.len() as u64;
-        let pb = progress_bar::new(len);
 
+        let len = sentence_list.len() as u64;
+        let pb = progress_bar::new(len, "Tokenizing");
+        let expression_list = tokenizer::tokenize_sentence_list(&sentence_list, &|| pb.inc(1));
+        pb.finish_with_message("Tokenized");
+
+        let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
+            .expect("Failed to retrieve sentences from the database");
+        let expression_list = database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);    
+
+        let len = expression_list.len() as u64;
+        let pb = progress_bar::new(len, "Importing");
         database::insert_expression_list(conn, expression_list, &|| pb.inc(1))
             .expect("Failed to insert expression");
 
@@ -298,7 +305,7 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             let line_list = file_content.split_whitespace();
             let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
             let len: u64 = expression_list.len() as u64;
-            let pb = progress_bar::new(len);
+            let pb = progress_bar::new(len, "Excluding");
 
             crate::database::update_is_excluded(&mut conn, &expression_list, true, &|| pb.inc(1))
                 .expect("Failed to update database");
@@ -319,7 +326,7 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             let line_list = file_content.split_whitespace();
             let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
             let len: u64 = expression_list.len() as u64;
-            let pb = progress_bar::new(len);
+            let pb = progress_bar::new(len, "Including");
 
             crate::database::update_is_excluded(&mut conn, &expression_list, false, &|| pb.inc(1))
                 .expect("Failed to update database");
@@ -344,7 +351,11 @@ pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         let expression_list = database::select_expression_list(&conn, false, false, false, "frequency", false, limit)?;
 
-        create_flashcards_from_expression_list(p, &mut conn, &dict, expression_list, max)?;
+        let pb = progress_bar::new(max as u64, "Generating");
+
+        create_flashcards_from_expression_list(p, &mut conn, &dict, expression_list, max, &|| pb.inc(1))?;
+        
+        pb.finish_with_message("Finished");
     }
 
     Ok(())

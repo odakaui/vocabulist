@@ -7,11 +7,12 @@ mod anki;
 mod posconverter;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::error::Error;
 use clap::{ArgMatches};
 use rusqlite::{Connection};
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use expression::{Expression};
 
 pub struct Preference {
@@ -19,6 +20,109 @@ pub struct Preference {
     pub dictionary_path: String,
     pub audio: bool,
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct Config {
+    database_path: String,
+    dictionary_path: String,
+    anki: AnkiConnect,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct AnkiConnect {
+    deck_name: String,
+    model_name: String,
+    allow_duplicates: bool,
+    duplicate_scope: String,
+    audio: bool,
+    fields: Vec<Vec<String>>,
+    tags: Vec<String>,
+}
+
+impl Config {
+    pub fn new(database_path: String, dictionary_path: String, anki: AnkiConnect) -> Config {
+        Config {
+            database_path,
+            dictionary_path,
+            anki,
+        }
+    }
+
+    pub fn default(config_directory_path: PathBuf) -> Config {
+        let deck_name = "Default".to_string();
+        let model_name = "Basic".to_string();
+        let allow_duplicates = false;
+        let duplicate_scope = "deck".to_string();
+        let audio = false;
+        let fields = vec![
+            vec!["Front".to_string(), "Back".to_string()], 
+            vec!["expression".to_string(), "definition".to_string()]
+        ];
+        let tags = vec!["vocabulist".to_string()];
+        let anki = AnkiConnect::new(deck_name, model_name, allow_duplicates, duplicate_scope, audio, fields, tags);
+
+        Config {
+            database_path: config_directory_path.join("vocabulist_rs.db").to_str().unwrap().to_string(),
+            dictionary_path: config_directory_path.join("jmdict.db").to_str().unwrap().to_string(),
+            anki: anki
+        }
+    }
+
+    fn database_path(&self) -> &str {
+        &self.database_path
+    }
+
+    fn dictionary_path(&self) -> &str {
+        &self.dictionary_path
+    }
+
+    fn anki(&self) -> &AnkiConnect {
+        &self.anki
+    }
+}
+
+impl AnkiConnect {
+    pub fn new(deck_name: String, model_name: String, allow_duplicates: bool, duplicate_scope: String, audio: bool, fields: Vec<Vec<String>>, tags: Vec<String>) -> AnkiConnect {
+        AnkiConnect {
+            deck_name,
+            model_name,
+            allow_duplicates,
+            duplicate_scope,
+            audio,
+            fields,
+            tags
+        }
+    }
+
+    fn deck_name(&self) -> &str {
+        &self.deck_name
+    }
+
+    fn model_name(&self) -> &str {
+        &self.model_name
+    }
+
+    fn allow_duplicates(&self) -> bool {
+        self.allow_duplicates
+    }
+
+    fn duplicate_scope(&self) -> &str {
+        &self.duplicate_scope
+    }
+
+    fn audio(&self) -> bool {
+        self.audio
+    }
+
+    fn fields(&self) -> &Vec<Vec<String>> {
+        &self.fields
+    }
+
+    fn tags(&self) -> &Vec<String> {
+        &self.tags
+    }
+}
+
 
 /// Open a file and clean the contents
 fn open_file(path: &str) -> Vec<String> {
@@ -76,7 +180,7 @@ fn format_anki_sentence(sentence_list: &Vec<String>) -> String {
     sentence_list[0].to_string()
 }
 
-fn create_flashcards_from_expression_list(p: Preference, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32) -> Result<(), Box<dyn Error>> {
+fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32) -> Result<(), Box<dyn Error>> {
     let mut i = 0;
     for expression in expression_list.iter() {
         let expression_string = &expression.get_expression();
@@ -113,9 +217,9 @@ fn create_flashcards_from_expression_list(p: Preference, conn: &mut Connection, 
     Ok(())
 }
 
-pub fn import(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
-    let database_path = p.database_path.as_ref();
+    let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
     let path =  Path::new(m.value_of("path").unwrap());
@@ -155,9 +259,9 @@ pub fn import(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn list(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
-    let database_path = p.database_path.as_ref();
+    let database_path = p.database_path();
     let conn = database::connect(database_path);
 
     let in_anki     = m.is_present("anki");
@@ -180,9 +284,9 @@ pub fn list(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn exclude(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
-    let database_path = p.database_path.as_ref();
+    let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
     if let Some(path) = m.value_of("path") {
@@ -201,9 +305,9 @@ pub fn exclude(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn include(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
-    let database_path = p.database_path.as_ref();
+    let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
     if let Some(path) = m.value_of("path") {
@@ -222,12 +326,12 @@ pub fn include(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn generate(p: Preference, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
-    let database_path = p.database_path.as_ref();
+    let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
-    let dictionary_path = p.dictionary_path.as_ref();
+    let dictionary_path = p.dictionary_path();
     let dict = dictionary::connect(dictionary_path)?;
 
     if let Some(max) = m.value_of("number") {

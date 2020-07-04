@@ -1,5 +1,8 @@
 use std::error::Error;
+use std::fs;
+use dirs;
 use clap::{Arg, App, SubCommand};
+use vocabulist_rs::{Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let match_list = App::new("Vocabulist")
@@ -67,21 +70,44 @@ fn main() -> Result<(), Box<dyn Error>> {
                                             .help("Sort by ascending instead of descending")))
                             .get_matches();
     
-    
-    let database_path = "/tmp/vocabulist_rs.db";
-    let dictionary_path = "jmdict.db";
-    let p = vocabulist_rs::Preference {
-        database_path: database_path.to_string(),
-        dictionary_path: dictionary_path.to_string(),
-        audio: true
-    };
+    // load the config file
+    let home_path = dirs::home_dir().expect("Failed to get home directory");
+    let config_directory_path = home_path.join(".vocabulist_rs");
+    let config_path = config_directory_path.join("config.toml");
+
+    if !config_directory_path.is_dir() {
+        fs::create_dir_all(&config_directory_path)?;
+    }
+
+    let toml_string: String;
+    match config_path.is_file() {
+        true => {
+            toml_string = fs::read_to_string(config_path)?;
+        },
+        false => {
+            let config = Config::default(config_directory_path);
+            toml_string = toml::to_string(&config).unwrap();
+
+            fs::write(config_path, &toml_string)?;
+        }
+    }
+
+    let config: Config = toml::from_str(&toml_string)?;
+
+//    let database_path = "/tmp/vocabulist_rs.db";
+//    let dictionary_path = "jmdict.db";
+//    let p = vocabulist_rs::Preference {
+//        database_path: database_path.to_string(),
+//        dictionary_path: dictionary_path.to_string(),
+//        audio: true
+//    };
 
     match match_list.subcommand() {
-        ("import", Some(m)) => vocabulist_rs::import(p, m),
-        ("list", Some(m)) => vocabulist_rs::list(p, m),
-        ("exclude", Some(m)) => vocabulist_rs::exclude(p, m),
-        ("include", Some(m)) => vocabulist_rs::include(p, m),
-        ("generate", Some(m)) => vocabulist_rs::generate(p, m),
+        ("import", Some(m)) => vocabulist_rs::import(config, m),
+        ("list", Some(m)) => vocabulist_rs::list(config, m),
+        ("exclude", Some(m)) => vocabulist_rs::exclude(config, m),
+        ("include", Some(m)) => vocabulist_rs::include(config, m),
+        ("generate", Some(m)) => vocabulist_rs::generate(config, m),
         _ => Ok(()),
     }?;
 

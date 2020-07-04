@@ -137,6 +137,10 @@ fn open_file(path: &str) -> Vec<String> {
     sentence_list
 }
 
+fn database_connection(database_path: &str) -> Connection {
+    database::connect(database_path)
+}
+
 fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_definition: bool, is_specific_kanji: bool) -> String {
     let mut definition_string = String::new();
     
@@ -341,6 +345,21 @@ pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         let expression_list = database::select_expression_list(&conn, false, false, false, "frequency", false, limit)?;
 
         create_flashcards_from_expression_list(p, &mut conn, &dict, expression_list, max)?;
+    }
+
+    Ok(())
+}
+
+pub fn sync(p: Config, _: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    // Initialize the database
+    let conn = database_connection(p.database_path());
+    let expression_list = anki::expression_list(&p)?;
+
+    database::reset_in_anki(&conn)?;
+
+    for expression in expression_list.iter() {
+        println!("{}", expression);
+        database::update_in_anki_for_expression(&conn, 1, expression)?;
     }
 
     Ok(())

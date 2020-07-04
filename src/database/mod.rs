@@ -5,6 +5,15 @@ use crate::{Expression};
 #[macro_use]
 /// sql!(update_in_anki_for_expression, query, params=[tx: &Transaction, expression: &str, in_anki: bool])
 macro_rules! sql {
+    ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty]) => { 
+        pub fn $fn_name($conn: $conn_type)  -> Result<(), Box<dyn Error>> {
+            let query = $query;
+
+            $conn.execute(query, params![])?;
+
+            Ok(())
+        }
+    };
     ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty, $($param:ident:$type:ty),+]) => { 
         pub fn $fn_name($conn: $conn_type, $($param: $type),+)  -> Result<(), Box<dyn Error>> {
             let params = params![$($param),+];
@@ -216,6 +225,8 @@ const SELECT_POS_FOR_EXPRESSION: &str = "SELECT pos FROM pos JOIN expressions_po
 const SELECT_SENTENCE_FOR_EXPRESSION: &str = "SELECT sentence FROM sentences JOIN expressions_pos_sentences_surface_strings ON sentence_id = sentences.id JOIN expressions ON expressions.id = expression_id WHERE expression = ?;";
 
 const UPDATE_IN_ANKI_FOR_EXPRESSION: &str = "UPDATE expressions SET in_anki = ? WHERE expression = ?;";
+
+const RESET_IN_ANKI: &str = "UPDATE expressions SET in_anki = 0 WHERE in_anki = 1;";
                                             
 pub fn select_pos_for_expression(conn: &Connection, expression: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let params = params![expression];
@@ -240,3 +251,5 @@ pub fn select_sentence_for_expression(conn: &Connection, expression: &str) -> Re
 }
 
 sql!(update_in_anki_for_expression, UPDATE_IN_ANKI_FOR_EXPRESSION, params=[conn: &Connection, in_anki: u32, expression: &str]);
+
+sql!(reset_in_anki, RESET_IN_ANKI, params=[conn: &Connection]);

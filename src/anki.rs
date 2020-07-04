@@ -30,7 +30,7 @@ fn url_for_expression(expression: &str, reading: &str) -> (String, String) {
         (url_string, file_string)
 }
 
-fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &str, reading: &str, sentence: &str) -> Value {
+fn verify_fields(field_list: &Vec<Vec<String>>) {
     if field_list.len() != 2 {
         panic!("The configuration data either the fields array or values array is missing.");
     }
@@ -41,8 +41,12 @@ fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &s
     if fields.len() != values.len() {
         panic!("The configuration data is invalid the fields and values array are not the same length.");
     }
+}
 
-    let field_value_iter = fields.iter().zip(values.iter());
+fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &str, reading: &str, sentence: &str) -> Value {
+    verify_fields(field_list);
+    let field_value_iter = field_list[0].iter().zip(field_list[1].iter());
+
     let mut audio_field_list: Vec<String> = Vec::new();
     let mut field_map: HashMap<String, String> = HashMap::new(); 
     for (f, v) in field_value_iter {
@@ -72,18 +76,9 @@ fn create_options(allow_duplicates: bool, duplicate_scope: String) -> Value {
 }
 
 fn create_audio_fields(field_list: &Vec<Vec<String>>) -> Value {
-    if field_list.len() != 2 {
-        panic!("The configuration data either the fields array or values array is missing.");
-    }
+    verify_fields(field_list);
+    let field_value_iter = field_list[0].iter().zip(field_list[1].iter());
 
-    let fields = &field_list[0];
-    let values = &field_list[1];
-
-    if fields.len() != values.len() {
-        panic!("The configuration data is invalid the fields and values array are not the same length.");
-    }
-
-    let field_value_iter = fields.iter().zip(values.iter());
     let mut audio_field_list: Vec<String> = Vec::new();
     for (f, v) in field_value_iter {
         if v.to_lowercase() == "audio" {
@@ -138,6 +133,67 @@ fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, se
     })
 }
 
+fn note_id_list(p: &Config) -> Result<Vec<Value>, Box<dyn Error>> {
+    let result = invoke("findNotes".to_string(), json!({ "query": format!("deck:\"{}\"", p.anki().deck_name())}))?;
+
+    if !result["result"].is_array() {
+        panic!("Response from Anki Connect does not contain an note id array");
+    }
+
+    let mut id_list: Vec<Value> = Vec::new();
+    for id in result["result"].as_array().unwrap().iter() {
+        id_list.push(id.clone());
+    }
+
+    Ok(id_list)
+}
+
+fn note_info_list_for_id_list(id_list: &Vec<Value>) -> Result<Vec<Value>, Box<dyn Error>> {
+    let result = invoke("notesInfo".to_string(), json!({ "notes": id_list }))?;
+
+    if !result["result"].is_array() {
+        panic!("Response from Anki Connect does not contain a note info array");
+    }
+
+    let mut info_list: Vec<Value> = Vec::new();
+    for info in result["result"].as_array().unwrap().iter() {
+        info_list.push(info.clone());
+    }
+
+    Ok(info_list)
+}
+
+fn expression_list_for_info_list(p: &Config, info_list: &Vec<Value>) -> Result<Vec<String>, Box<dyn Error>> {
+    let fields = p.anki().fields();
+    verify_fields(fields);
+    let field_value_iter = fields[0].iter().zip(fields[1].iter());
+
+    let mut expression_field = "".to_string();
+    for (f, v) in field_value_iter {
+        if v.to_lowercase() == "expression" {
+            expression_field = f.to_string();
+            break
+        }
+    }
+
+    let mut expression_list: Vec<String> = Vec::new();
+    for note in info_list.iter() {
+        match note.is_object() {
+            true => {
+                let note = note.as_object().unwrap();
+                let fields = note["fields"].as_object().unwrap();
+                let expression = fields[&expression_field].as_object().unwrap()["value"]
+                    .as_str().unwrap().to_string();
+
+                expression_list.push(expression);
+            },
+            false => panic!("Invalid note in info_list")
+        }
+    }
+    
+    Ok(expression_list)
+}
+
 pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(String, String)> {
     let mut url_list: Vec<(String, String)> = Vec::new();
     match reading_list.len() {
@@ -157,9 +213,13 @@ pub fn insert_note(p: &Config, definition: &str, expression: &str, reading: &str
     invoke("addNote".to_string(), params)?;
 
     Ok(())
-
-        
-
-
 }
 
+
+pub fn expression_list(p: &Config) -> Result<Vec<String>, Box<dyn Error>> {
+    let id_list = note_id_list(&p)?;
+    let info_list = note_info_list_for_id_list(&id_list)?;
+    let expression_list = expression_list_for_info_list(&p, &info_list)?;
+
+    Ok(expression_list)
+}

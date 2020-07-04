@@ -40,6 +40,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                             .required(false)
                                             .default_value("10")
                                             .help("Number of flashcards to generate")))
+                            .subcommand(SubCommand::with_name("sync")
+                                        .about("sync database with anki"))
                             .subcommand(SubCommand::with_name("list")
                                         .about("list vocabulary")
                                         .arg(Arg::with_name("number")
@@ -94,16 +96,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config: Config = toml::from_str(&toml_string)?;
 
-//    let database_path = "/tmp/vocabulist_rs.db";
-//    let dictionary_path = "jmdict.db";
-//    let p = vocabulist_rs::Preference {
-//        database_path: database_path.to_string(),
-//        dictionary_path: dictionary_path.to_string(),
-//        audio: true
-//    };
-
     match match_list.subcommand() {
         ("import", Some(m)) => vocabulist_rs::import(config, m),
+        ("sync", Some(m)) => vocabulist_rs::sync(config, m),
         ("list", Some(m)) => vocabulist_rs::list(config, m),
         ("exclude", Some(m)) => vocabulist_rs::exclude(config, m),
         ("include", Some(m)) => vocabulist_rs::include(config, m),

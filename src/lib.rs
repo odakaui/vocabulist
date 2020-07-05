@@ -195,7 +195,7 @@ fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict
         let sentence_list = database::select_sentence_for_expression(&conn, expression_string)?;
 
         if definition_list.len() == 0 {
-            database::update_is_excluded(conn, &vec![expression.clone()], true, &|| {})?;
+            database::update_is_excluded_for_expression_list(conn, &vec![expression.clone()], true, &|| {})?;
             continue
         }
 
@@ -316,16 +316,25 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let mut conn = database::connect(database_path);
 
     if let Some(path) = m.value_of("path") {
-            let file_content = fs::read_to_string(path).expect("Failed to open file");
-            let line_list = file_content.split_whitespace();
-            let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
-            let len: u64 = expression_list.len() as u64;
-            let pb = progress_bar::new(len, "Excluding");
+        let file_content = fs::read_to_string(path).expect("Failed to open file");
+        let line_list = file_content.split_whitespace();
 
-            crate::database::update_is_excluded(&mut conn, &expression_list, true, &|| pb.inc(1))
-                .expect("Failed to update database");
-
-            pb.finish_with_message("Excluded");
+        match m.is_present("pos") {
+            true => {
+                let pos_list: Vec<String> = line_list.map(|x| x.to_string()).collect();
+                let len: u64 = pos_list.len() as u64;
+                let pb = progress_bar::new(len, "Excluding");
+                crate::database::update_is_excluded_for_pos_list(&mut conn, &pos_list, true, &|| pb.inc(1))?;
+                pb.finish_with_message("Excluded");
+            },
+            false => {
+                let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+                let len: u64 = expression_list.len() as u64;
+                let pb = progress_bar::new(len, "Excluding");
+                crate::database::update_is_excluded_for_expression_list(&mut conn, &expression_list, true, &|| pb.inc(1))?;
+                pb.finish_with_message("Excluded");
+            },
+        }
     }
 
     Ok(())
@@ -337,16 +346,25 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let mut conn = database::connect(database_path);
 
     if let Some(path) = m.value_of("path") {
-            let file_content = fs::read_to_string(path).expect("Failed to open file");
-            let line_list = file_content.split_whitespace();
-            let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
-            let len: u64 = expression_list.len() as u64;
-            let pb = progress_bar::new(len, "Including");
+        let file_content = fs::read_to_string(path).expect("Failed to open file");
+        let line_list = file_content.split_whitespace();
 
-            crate::database::update_is_excluded(&mut conn, &expression_list, false, &|| pb.inc(1))
-                .expect("Failed to update database");
-
-            pb.finish_with_message("Included");
+        match m.is_present("pos") {
+            true => {
+                let pos_list: Vec<String> = line_list.map(|x| x.to_string()).collect();
+                let len: u64 = pos_list.len() as u64;
+                let pb = progress_bar::new(len, "Including");
+                crate::database::update_is_excluded_for_pos_list(&mut conn, &pos_list, false, &|| pb.inc(1))?;
+                pb.finish_with_message("Included");
+            },
+            false => {
+                let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+                let len: u64 = expression_list.len() as u64;
+                let pb = progress_bar::new(len, "Including");
+                crate::database::update_is_excluded_for_expression_list(&mut conn, &expression_list, false, &|| pb.inc(1))?;
+                pb.finish_with_message("Included");
+            },
+        }
     }
 
     Ok(())

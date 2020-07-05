@@ -83,12 +83,32 @@ fn main() -> Result<(), Box<dyn Error>> {
                             .get_matches();
     
     // load the config file
-    let home_path = dirs::home_dir().expect("Failed to get home directory");
-    let config_directory_path = home_path.join(".vocabulist_rs");
-    let config_path = config_directory_path.join("config.toml");
+    let home_path;
+    let config_directory_path;
+    let config_path;
 
-    if !config_directory_path.is_dir() {
-        fs::create_dir_all(&config_directory_path)?;
+    match !cfg!(debug_assertions) {
+        true => {
+            home_path = dirs::home_dir().expect("Failed to get home directory");
+            config_directory_path = home_path.join(".vocabulist_rs");
+            config_path = config_directory_path.join("config.toml");
+
+            if !config_directory_path.is_dir() {
+                fs::create_dir_all(&config_directory_path)?;
+            }
+        },
+        false => {
+
+            home_path = std::env::current_exe()?.parent().unwrap().to_path_buf();
+            config_directory_path = home_path.clone();
+            config_path = config_directory_path.join("config.toml");
+
+            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
+            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
+            println!("Using target/deb as home directory.");
+            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
+            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
+        }
     }
 
     let toml_string: String;

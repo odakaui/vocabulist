@@ -1,4 +1,4 @@
-# vocabulist
+vocabulist
 ------------
 
 So, you're learning Japanese.

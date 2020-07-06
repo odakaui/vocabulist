@@ -66,7 +66,7 @@ tags = ["vocabulist"]       # the tags for the cards
 
 # The fields in the anki model mode_name.
 # Consists of two vectors of equal length.
-# The first vector contains the names of the fields.
+# The first vector contains the names of the fields in the anki model.
 # The second vector contains the values that corresponds to the fields.
 # the allowed values are:
 # expression - the term for the card (may contain kanji)

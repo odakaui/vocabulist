@@ -2,12 +2,15 @@
 ------------
 
 So, you're learning Japanese.
+
 You've mastered Hiragana and Katakana and you've decided to build your vocabulary.
 You do some research online and everyone says, "Use flashcards!"
 So, you do a bit of searching and download Anki.
 
 Now, you're all set.
+
 Armed with your knowledge of Hiragana and your trusty Anki install, you set out to create flashcards.
+
 You go online and find yourself a Japanese frequency list. 
 Then, starting from the top, you pick an term, look up the definition on jisho.org, and finally input the data into Anki.
 

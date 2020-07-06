@@ -59,6 +59,7 @@ To build __vocabulist__:
 $ git clone https://github.com/odakaui/vocabulist.git
 $ cd vocabulist
 $ cargo build --release
+$ mv jmdict.db "${HOME}/.vocabulist_rs/"
 ```
 
 ### Features

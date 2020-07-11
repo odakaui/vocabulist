@@ -1,14 +1,13 @@
 language: rust
 rust:
     - stable
-    - beta
-    - nightly
 jobs:
-    allow_failures:
-        - rust: nightly
-        - rust: beta
-    fast_finish: true
+    include:
+        - env: TARGET=x86_64-apple-darwin
+          os: osx
+        - env: TARGET=x86_64-pc-windows-msvc
+        - env: TARGET=x86_64-unknown-linux-gnu
 cache: cargo
 script:
-    - cargo build --verbose --all
-    - cargo test --verbose --all
+    - cargo test --verbose --all --target $TARGET
+    - cargo build --verbose --all --release --target $TARGET

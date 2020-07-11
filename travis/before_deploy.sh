@@ -21,9 +21,9 @@ cd $stage
 if [ -z "$var" ]
 then
     echo "Draft Release"
-    tar czf "${src}/${NAME}-${TARGET}.tar.gz" .
+    tar czf "${src}/${NAME}-${TARGET}.tar.gz" ./*
 else
-    tar czf "${src}/${NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz" .
+    tar czf "${src}/${NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz" ./*
 fi
 
 cd $src

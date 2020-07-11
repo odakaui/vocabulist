@@ -13,16 +13,16 @@ case $TRAVIS_OS_NAME in
         ;;
 esac
 
-cp target/$TARGET/release/vocabulst_rs $stage/
+cp target/$TARGET/release/$BINARY_NAME $stage/
 
 cd $stage
 
 # if the commit has a tag add it to the filename
 if [ -z "$var" ]
 then
-    tar czf "${src}/vocabulist-${TARGET}.tar.gz"
+    tar czf "${src}/${NAME}-${TARGET}.tar.gz" *
 else
-    tar czf "${src}/vocabulist-${TRAVIS_TAG}-${TARGET}.tar.gz"
+    tar czf "${src}/${NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz" *
 fi
 
 cd $src

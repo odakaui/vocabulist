@@ -16,7 +16,12 @@ case $TRAVIS_OS_NAME in
         ;;
 esac
 
-cp target/$TARGET/release/$BINARY_NAME $stage/
+mkdir $stage/$NAME
+
+cp target/$TARGET/release/$BINARY_NAME $stage/$NAME
+cp jmdict.db $stage/$NAME
+cp ACKNOWLEDGEMENTS.md $stage/$NAME
+cp LICENSE.md $stage/$NAME
 
 cd $stage
 
@@ -24,9 +29,9 @@ cd $stage
 if [ -z "$var" ]
 then
     echo "Draft Release"
-    tar czf "${src}/${NAME}-${TARGET}.tar.gz" *
+    tar czf "${src}/${NAME}-${TARGET}.tar.gz" $NAME
 else
-    tar czf "${src}/${NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz" *
+    tar czf "${src}/${NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz" $NAME
 fi
 
 cd $src

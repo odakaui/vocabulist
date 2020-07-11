@@ -6,6 +6,7 @@ env:
   global:
     - NAME=vocabulist
     - BINARY_NAME=vocabulist_rs
+
 jobs:
   include:
   - env: TARGET=x86_64-apple-darwin

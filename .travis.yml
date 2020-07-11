@@ -16,11 +16,14 @@ script:
   - cargo test --verbose --all --target $TARGET
   - cargo build --verbose --all --release --target $TARGET
 
+before_deploy:
+  - bash travis/before_deploy.sh
+
 deploy:
   - provider: releases
     api_key:
       secure: ff2vw5Oss9TsMrrrl2AJJllGlbDm4ICe4Ov3FckEUAPESAEfSZUe5Zy056xBzSOA0jiY5hp+eRdb2ua9TlphWRrmg+blnyz70W3gfs+2uXj8SKhjp72/2IBTMoqijZrMqJwvLmnKIzGfAWhLPlHi2YQ5txltpA7wRqlabQgq3NoXsKULHlESZxLDdE7uygT9kwHa6NbonAuthF/26bnS1Yic9HgHzBMfwhtqYh6phhZLWJTyxa9Xd1hsbq4xj5fgjsfmivBhko/YKeXXYlmWsXNDwwhwD47bkXtOEGGt6uZBS6TVMuNAVQfcfzSnIniWoMuMB88lWBv9t7UZ2oAmMk9wHq6kDDfkKLItFO5d3UgdTb8nSo5NK35tlYg91noTI6X10l3aYHVwpeB1z06kk0kuguEl9UU1AVkqVSBvcz8cVqrpoj9x93x7kpTegAGB+epXa2bML5wFjOTPmLYBYq35X7lhF/chz/u4VgJMHiytOYyfEx+QUBKyPFV0nHNdyhpwEky48ithivLTwYlLXUkqREDp0MeCZd/lhPm4R/UfwGRuybNgD5P1/he5DDy47wVIo4AbY98ABnk1+2A3KwvKFokULSk/yMGqs/JA1BWutbyj7XIDi6GNDZHBjAoPW6BVBIo2vf2yoy36Lbw4FTapGViPwNsMK0m4dqRRouo=
-    file: target/release/vocabulist_rs
+    file: vocabulist-$TRAVIS_TAG-$TARGET.*
     on:
       repo: odakaui/vocabulist
       tags: true
@@ -28,9 +31,13 @@ deploy:
   - provider: releases
     api_key:
       secure: ff2vw5Oss9TsMrrrl2AJJllGlbDm4ICe4Ov3FckEUAPESAEfSZUe5Zy056xBzSOA0jiY5hp+eRdb2ua9TlphWRrmg+blnyz70W3gfs+2uXj8SKhjp72/2IBTMoqijZrMqJwvLmnKIzGfAWhLPlHi2YQ5txltpA7wRqlabQgq3NoXsKULHlESZxLDdE7uygT9kwHa6NbonAuthF/26bnS1Yic9HgHzBMfwhtqYh6phhZLWJTyxa9Xd1hsbq4xj5fgjsfmivBhko/YKeXXYlmWsXNDwwhwD47bkXtOEGGt6uZBS6TVMuNAVQfcfzSnIniWoMuMB88lWBv9t7UZ2oAmMk9wHq6kDDfkKLItFO5d3UgdTb8nSo5NK35tlYg91noTI6X10l3aYHVwpeB1z06kk0kuguEl9UU1AVkqVSBvcz8cVqrpoj9x93x7kpTegAGB+epXa2bML5wFjOTPmLYBYq35X7lhF/chz/u4VgJMHiytOYyfEx+QUBKyPFV0nHNdyhpwEky48ithivLTwYlLXUkqREDp0MeCZd/lhPm4R/UfwGRuybNgD5P1/he5DDy47wVIo4AbY98ABnk1+2A3KwvKFokULSk/yMGqs/JA1BWutbyj7XIDi6GNDZHBjAoPW6BVBIo2vf2yoy36Lbw4FTapGViPwNsMK0m4dqRRouo=
-    file: target/release/vocabulist_rs
+    file: vocabulist-$TARGET.*
     draft: 'true'
     on:
       repo: odakaui/vocabulist
       tags: 'false'
     skip_cleanup: 'true'
+
+branches:
+  only:
+    - master

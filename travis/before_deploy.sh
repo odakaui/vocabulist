@@ -26,7 +26,7 @@ cp LICENSE.md $stage/$NAME
 cd $stage
 
 # if the commit has a tag add it to the filename
-if [ -z "$var" ]
+if [ -z "$TRAVIS_TAG" ]
 then
     echo "Draft Release"
     tar czf "${src}/${NAME}-${TARGET}.tar.gz" $NAME

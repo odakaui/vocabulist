@@ -1,19 +1,19 @@
-mod database;
-mod expression;
-mod tokenizer;
-mod progress_bar;
-mod dictionary;
 mod anki;
+mod database;
+mod dictionary;
+mod expression;
 mod posconverter;
+mod progress_bar;
+mod tokenizer;
 
+use clap::ArgMatches;
+use expression::Expression;
+use itertools::Itertools;
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::error::Error;
-use clap::{ArgMatches};
-use rusqlite::{Connection};
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use expression::{Expression};
 
 pub struct Preference {
     pub database_path: String,
@@ -55,16 +55,32 @@ impl Config {
         let duplicate_scope = "deck".to_string();
         let audio = false;
         let fields = vec![
-            vec!["Front".to_string(), "Back".to_string()], 
-            vec!["expression".to_string(), "definition".to_string()]
+            vec!["Front".to_string(), "Back".to_string()],
+            vec!["expression".to_string(), "definition".to_string()],
         ];
         let tags = vec!["vocabulist".to_string()];
-        let anki = AnkiConnect::new(deck_name, model_name, allow_duplicates, duplicate_scope, audio, fields, tags);
+        let anki = AnkiConnect::new(
+            deck_name,
+            model_name,
+            allow_duplicates,
+            duplicate_scope,
+            audio,
+            fields,
+            tags,
+        );
 
         Config {
-            database_path: config_directory_path.join("vocabulist_rs.db").to_str().unwrap().to_string(),
-            dictionary_path: config_directory_path.join("jmdict.db").to_str().unwrap().to_string(),
-            anki: anki
+            database_path: config_directory_path
+                .join("vocabulist_rs.db")
+                .to_str()
+                .unwrap()
+                .to_string(),
+            dictionary_path: config_directory_path
+                .join("jmdict.db")
+                .to_str()
+                .unwrap()
+                .to_string(),
+            anki: anki,
         }
     }
 
@@ -82,7 +98,15 @@ impl Config {
 }
 
 impl AnkiConnect {
-    pub fn new(deck_name: String, model_name: String, allow_duplicates: bool, duplicate_scope: String, audio: bool, fields: Vec<Vec<String>>, tags: Vec<String>) -> AnkiConnect {
+    pub fn new(
+        deck_name: String,
+        model_name: String,
+        allow_duplicates: bool,
+        duplicate_scope: String,
+        audio: bool,
+        fields: Vec<Vec<String>>,
+        tags: Vec<String>,
+    ) -> AnkiConnect {
         AnkiConnect {
             deck_name,
             model_name,
@@ -90,7 +114,7 @@ impl AnkiConnect {
             duplicate_scope,
             audio,
             fields,
-            tags
+            tags,
         }
     }
 
@@ -123,16 +147,20 @@ impl AnkiConnect {
     }
 }
 
-
 /// Open a file and clean the contents
 fn open_file(path: &str) -> Vec<String> {
-    let contents = fs::read_to_string(path).expect("Can't read file")
+    let contents = fs::read_to_string(path)
+        .expect("Can't read file")
         .replace(&['「', '」', '『', '』', '…'][..], "")
         .replace(&['。'][..], "。\n")
         .replace(&['？'][..], "？\n")
         .replace(&['！'][..], "！\n");
 
-    let sentence_list: Vec<String> = contents.lines().filter(|x| x != &"").map(|x| x.trim().to_string()).collect();
+    let sentence_list: Vec<String> = contents
+        .lines()
+        .filter(|x| x != &"")
+        .map(|x| x.trim().to_string())
+        .collect();
 
     sentence_list
 }
@@ -141,9 +169,13 @@ fn database_connection(database_path: &str) -> Connection {
     database::connect(database_path)
 }
 
-fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_definition: bool, is_specific_kanji: bool) -> String {
+fn format_anki_definition(
+    definition_list: &Vec<Vec<String>>,
+    is_specific_definition: bool,
+    is_specific_kanji: bool,
+) -> String {
     let mut definition_string = String::new();
-    
+
     if !is_specific_definition {
         definition_string.push_str("WARNING: Not filtered by pos.<br>\n");
     }
@@ -158,8 +190,8 @@ fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_defini
         for (i, d) in definition.iter().enumerate() {
             match i {
                 0 => definition_string.push_str(d),
-                _ => definition_string.push_str(&format!("; {}", d))
-            }; 
+                _ => definition_string.push_str(&format!("; {}", d)),
+            };
         }
         definition_string.push_str("</li>\n");
     }
@@ -173,7 +205,7 @@ fn format_anki_reading(reading_list: &Vec<String>) -> String {
     for (i, reading) in reading_list.iter().enumerate() {
         match i {
             0 => reading_string.push_str(reading),
-            _ => reading_string.push_str(&format!("; {}", reading))
+            _ => reading_string.push_str(&format!("; {}", reading)),
         };
     }
 
@@ -184,38 +216,64 @@ fn format_anki_sentence(sentence_list: &Vec<String>) -> String {
     sentence_list[0].to_string()
 }
 
-fn create_flashcards_from_expression_list(p: Config, conn: &mut Connection, dict: &Connection, expression_list: Vec<Expression>, max: i32, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
+fn create_flashcards_from_expression_list(
+    p: Config,
+    conn: &mut Connection,
+    dict: &Connection,
+    expression_list: Vec<Expression>,
+    max: i32,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
     let mut i = 0;
     for expression in expression_list.iter() {
         let expression_string = &expression.get_expression();
 
-        let (definition_list, is_specific_kanji) = dictionary::select_definition_for_expression(&dict, expression_string)?;
+        let (definition_list, is_specific_kanji) =
+            dictionary::select_definition_for_expression(&dict, expression_string)?;
         let pos_list = database::select_pos_for_expression(&conn, expression_string)?;
         let reading_list = dictionary::select_reading_for_expression(&dict, expression_string)?;
         let sentence_list = database::select_sentence_for_expression(&conn, expression_string)?;
 
         if definition_list.len() == 0 {
-            database::update_is_excluded_for_expression_list(conn, &vec![expression.clone()], true, &|| {})?;
-            continue
+            database::update_is_excluded_for_expression_list(
+                conn,
+                &vec![expression.clone()],
+                true,
+                &|| {},
+            )?;
+            continue;
         }
 
-        let (definition_list, is_specific_definition) = dictionary::filter_definition_with_pos_list(&definition_list, &posconverter::convert_pos_list(&pos_list));
+        let (definition_list, is_specific_definition) = dictionary::filter_definition_with_pos_list(
+            &definition_list,
+            &posconverter::convert_pos_list(&pos_list),
+        );
 
         // remove duplicate entries
         let definition_list = definition_list.into_iter().unique().collect();
 
-        let definition_string = format_anki_definition(&definition_list, is_specific_definition, is_specific_kanji);
+        let definition_string =
+            format_anki_definition(&definition_list, is_specific_definition, is_specific_kanji);
         let expression_string = expression.get_expression();
         let reading_string = format_anki_reading(&reading_list);
         let sentence_string = format_anki_sentence(&sentence_list);
         let url_list = anki::create_url_list(expression_string, &reading_list);
 
-        anki::insert_note(&p, &definition_string, &expression_string, &reading_string, &sentence_string, &url_list)?;
+        anki::insert_note(
+            &p,
+            &definition_string,
+            &expression_string,
+            &reading_string,
+            &sentence_string,
+            &url_list,
+        )?;
         database::update_in_anki_for_expression(conn, 1u32, expression_string)?;
 
         i += 1;
 
-        if i >= max { break }
+        if i >= max {
+            break;
+        }
 
         callback();
     }
@@ -228,7 +286,7 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
-    let path =  Path::new(m.value_of("path").unwrap());
+    let path = Path::new(m.value_of("path").unwrap());
 
     fn import_file(conn: &mut Connection, path: &str) {
         let sentence_list = open_file(path);
@@ -240,7 +298,8 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
             .expect("Failed to retrieve sentences from the database");
-        let expression_list = database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);    
+        let expression_list =
+            database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);
 
         let len = expression_list.len() as u64;
         let pb = progress_bar::new(len, "Importing");
@@ -279,27 +338,35 @@ pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         true => {
             let is_excluded = m.is_present("excluded");
             let is_asc = m.is_present("asc");
-            let limit =  m.value_of("number").unwrap().parse::<i32>().unwrap();
+            let limit = m.value_of("number").unwrap().parse::<i32>().unwrap();
 
             let pos_list = database::select_pos_list(&conn, is_excluded, is_asc, limit)?;
 
             for pos in pos_list {
                 println!("{}", pos);
             }
-        },
+        }
         false => {
-            let in_anki     = m.is_present("anki");
+            let in_anki = m.is_present("anki");
             let is_excluded = m.is_present("excluded");
-            let is_learned  = m.is_present("learned");
-            let order_by    = match m.value_of("order") {
+            let is_learned = m.is_present("learned");
+            let order_by = match m.value_of("order") {
                 Some(order) => order,
-                None => "frequency"
+                None => "frequency",
             };
-            let is_asc      = m.is_present("asc");
-            let limit       = m.value_of("number").unwrap().parse::<i32>().unwrap();
+            let is_asc = m.is_present("asc");
+            let limit = m.value_of("number").unwrap().parse::<i32>().unwrap();
 
-            let expression_list = database::select_expression_list(&conn, in_anki, is_excluded, is_learned, order_by, is_asc, limit)
-                .expect("Failed to get expressions from database");
+            let expression_list = database::select_expression_list(
+                &conn,
+                in_anki,
+                is_excluded,
+                is_learned,
+                order_by,
+                is_asc,
+                limit,
+            )
+            .expect("Failed to get expressions from database");
 
             for expression in expression_list {
                 println!("{}", expression.get_expression());
@@ -324,16 +391,27 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
                 let pos_list: Vec<String> = line_list.map(|x| x.to_string()).collect();
                 let len: u64 = pos_list.len() as u64;
                 let pb = progress_bar::new(len, "Excluding");
-                crate::database::update_is_excluded_for_pos_list(&mut conn, &pos_list, true, &|| pb.inc(1))?;
+                crate::database::update_is_excluded_for_pos_list(
+                    &mut conn,
+                    &pos_list,
+                    true,
+                    &|| pb.inc(1),
+                )?;
                 pb.finish_with_message("Excluded");
-            },
+            }
             false => {
-                let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+                let expression_list: Vec<Expression> =
+                    line_list.map(|x| Expression::new(x.to_string())).collect();
                 let len: u64 = expression_list.len() as u64;
                 let pb = progress_bar::new(len, "Excluding");
-                crate::database::update_is_excluded_for_expression_list(&mut conn, &expression_list, true, &|| pb.inc(1))?;
+                crate::database::update_is_excluded_for_expression_list(
+                    &mut conn,
+                    &expression_list,
+                    true,
+                    &|| pb.inc(1),
+                )?;
                 pb.finish_with_message("Excluded");
-            },
+            }
         }
     }
 
@@ -354,16 +432,27 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
                 let pos_list: Vec<String> = line_list.map(|x| x.to_string()).collect();
                 let len: u64 = pos_list.len() as u64;
                 let pb = progress_bar::new(len, "Including");
-                crate::database::update_is_excluded_for_pos_list(&mut conn, &pos_list, false, &|| pb.inc(1))?;
+                crate::database::update_is_excluded_for_pos_list(
+                    &mut conn,
+                    &pos_list,
+                    false,
+                    &|| pb.inc(1),
+                )?;
                 pb.finish_with_message("Included");
-            },
+            }
             false => {
-                let expression_list: Vec<Expression> = line_list.map(|x| Expression::new(x.to_string())).collect();
+                let expression_list: Vec<Expression> =
+                    line_list.map(|x| Expression::new(x.to_string())).collect();
                 let len: u64 = expression_list.len() as u64;
                 let pb = progress_bar::new(len, "Including");
-                crate::database::update_is_excluded_for_expression_list(&mut conn, &expression_list, false, &|| pb.inc(1))?;
+                crate::database::update_is_excluded_for_expression_list(
+                    &mut conn,
+                    &expression_list,
+                    false,
+                    &|| pb.inc(1),
+                )?;
                 pb.finish_with_message("Included");
-            },
+            }
         }
     }
 
@@ -380,14 +469,24 @@ pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     if let Some(max) = m.value_of("number") {
         let max = max.parse::<i32>().unwrap();
-        let limit = max*2;
+        let limit = max * 2;
 
-        let expression_list = database::select_expression_list(&conn, false, false, false, "frequency", false, limit)?;
+        let expression_list = database::select_expression_list(
+            &conn,
+            false,
+            false,
+            false,
+            "frequency",
+            false,
+            limit,
+        )?;
 
         let pb = progress_bar::new(max as u64, "Generating");
 
-        create_flashcards_from_expression_list(p, &mut conn, &dict, expression_list, max, &|| pb.inc(1))?;
-        
+        create_flashcards_from_expression_list(p, &mut conn, &dict, expression_list, max, &|| {
+            pb.inc(1)
+        })?;
+
         pb.finish_with_message("Finished");
     }
 

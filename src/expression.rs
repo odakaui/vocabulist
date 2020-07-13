@@ -16,7 +16,7 @@ impl Expression {
             ..Default::default()
         }
     }
-    
+
     pub fn pos(self, pos: Vec<String>) -> Expression {
         Expression {
             expression: self.expression,
@@ -24,7 +24,7 @@ impl Expression {
             sentence: self.sentence,
             surface_string: self.surface_string,
             reading: self.reading,
-            definition: self.definition
+            definition: self.definition,
         }
     }
 
@@ -35,7 +35,7 @@ impl Expression {
             sentence: sentence,
             surface_string: self.surface_string,
             reading: self.reading,
-            definition: self.definition
+            definition: self.definition,
         }
     }
 
@@ -46,7 +46,7 @@ impl Expression {
             sentence: self.sentence,
             surface_string: surface_string,
             reading: self.reading,
-            definition: self.definition
+            definition: self.definition,
         }
     }
 
@@ -66,4 +66,3 @@ impl Expression {
         &self.pos
     }
 }
-

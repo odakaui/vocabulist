@@ -1,7 +1,7 @@
-use std::process::{Command, Stdio};
 use std::io::Write;
+use std::process::{Command, Stdio};
 
-use crate::{Expression};
+use crate::Expression;
 
 /// Tokenize the sentences
 fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
@@ -10,11 +10,15 @@ fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
         .stdout(Stdio::piped())
         .spawn()
         .expect("Failed to start jumanpp process");
-    
-    let stdin = jumanpp.stdin.as_mut().expect("Failed to get jumanpp stdin");
-        stdin.write_all(sentence.as_bytes()).expect("Failed to write to jumanpp stdin");
 
-    let jumanpp_output = jumanpp.wait_with_output().expect("Failed to wait for jumanpp");
+    let stdin = jumanpp.stdin.as_mut().expect("Failed to get jumanpp stdin");
+    stdin
+        .write_all(sentence.as_bytes())
+        .expect("Failed to write to jumanpp stdin");
+
+    let jumanpp_output = jumanpp
+        .wait_with_output()
+        .expect("Failed to wait for jumanpp");
     let token_string = String::from_utf8_lossy(&jumanpp_output.stdout);
     let token_list: Vec<Vec<&str>> = token_string
         .lines()
@@ -35,7 +39,7 @@ fn tokenize_sentence(sentence: &str) -> Vec<Expression> {
             expression_list.push(expression);
         }
     }
-    
+
     expression_list
 }
 
@@ -51,4 +55,3 @@ pub fn tokenize_sentence_list(sentence_list: &Vec<String>, callback: &dyn Fn()) 
 
     expression_list
 }
-

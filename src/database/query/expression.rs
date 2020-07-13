@@ -1,18 +1,22 @@
+use rusqlite::{params, Transaction};
 use std::error::Error;
-use rusqlite::{Transaction, params};
 
 /* Expression Functions */
 
 pub fn insert(tx: &Transaction, string: &str) -> Result<(), Box<dyn Error>> {
     let params = params![string];
-    let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;"; 
+    let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
 
     tx.execute(query, params)?;
 
     Ok(())
 }
 
-pub fn update_is_excluded(tx: &Transaction, string: &str, is_excluded: bool) -> Result<(), Box<dyn Error>> {
+pub fn update_is_excluded(
+    tx: &Transaction,
+    string: &str,
+    is_excluded: bool,
+) -> Result<(), Box<dyn Error>> {
     let is_excluded = if is_excluded { 1 } else { 0 };
     let params = params![is_excluded, string];
     let query = "UPDATE expressions SET is_excluded = ? WHERE expression = ?;";

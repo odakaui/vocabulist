@@ -1,5 +1,5 @@
+use rusqlite::{params, Transaction};
 use std::error::Error;
-use rusqlite::{Transaction, params};
 
 /* Pos Functions */
 

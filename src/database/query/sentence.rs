@@ -1,7 +1,7 @@
+use rusqlite::{params, Connection, Transaction};
 use std::error::Error;
-use rusqlite::{Transaction, Connection, params};
 
-/* Sentence Functions */ 
+/* Sentence Functions */
 
 pub fn insert(tx: &Transaction, string: &str) -> Result<(), Box<dyn Error>> {
     let params = params![string];
@@ -22,7 +22,7 @@ pub fn select_id(tx: &Transaction, string: &str) -> Result<i32, Box<dyn Error>> 
 }
 
 pub fn exists(conn: &Connection, string: &str) -> Result<bool, Box<dyn Error>> {
-    let params = params![string];       
+    let params = params![string];
     let mut query = conn.prepare("SELECT id FROM sentences WHERE sentence = ?;")?;
     let exists = query.exists(params)?;
 

@@ -3,10 +3,14 @@ pub mod jumanpp;
 pub trait Tokenizer {
     fn new() -> Self;
 
-    fn tokenize_sentence_list(&self, sentence_list: &Vec<String>, callback: &dyn Fn()) -> Vec<Token>;
+    fn tokenize_sentence_list(
+        &self,
+        sentence_list: &Vec<String>,
+        callback: &dyn Fn(),
+    ) -> Vec<Token>;
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone, Default)]
 pub struct Token {
     token: String,
     pos: Vec<String>,

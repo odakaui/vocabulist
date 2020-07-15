@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tokenizer::{Tokenizer, Token};
+use tokenizer::jumanpp::Jumanpp;
 
 pub struct Preference {
     pub database_path: String,
@@ -165,6 +167,20 @@ fn open_file(path: &str) -> Vec<String> {
     sentence_list
 }
 
+fn token_list_to_expression_list(token_list: Vec<Token>) -> Vec<Expression> {
+    let mut expression_list: Vec<Expression> = Vec::new();
+    for token in token_list.into_iter() {
+        let expression = Expression::new(token.get_token().to_string())
+            .pos(token.get_pos().clone())
+            .sentence(token.get_sentence().clone())
+            .surface_string(token.get_surface_string().clone());
+
+        expression_list.push(expression);
+    }
+
+    expression_list
+}
+
 fn database_connection(database_path: &str) -> Connection {
     database::connect(database_path)
 }
@@ -293,7 +309,8 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         let len = sentence_list.len() as u64;
         let pb = progress_bar::new(len, "Tokenizing");
-        let expression_list = tokenizer::tokenize_sentence_list(&sentence_list, &|| pb.inc(1));
+        let jumanpp = Jumanpp::new();
+        let expression_list = token_list_to_expression_list(jumanpp.tokenize_sentence_list(&sentence_list, &|| pb.inc(1)));
         pb.finish_with_message("Tokenized");
 
         let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)

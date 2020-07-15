@@ -1,6 +1,8 @@
 vocabulist
 ------------
 
+[![Build Status](https://travis-ci.org/odakaui/vocabulist.svg?branch=master)](https://travis-ci.org/github/odakaui/vocabulist)
+
 So, you're learning Japanese.
 
 You've mastered Hiragana and Katakana and you've decided to build your vocabulary.

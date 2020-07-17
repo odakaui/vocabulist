@@ -10,7 +10,7 @@ pub struct Mecab {
 }
 
 impl Mecab {
-    fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Mecab { path }
     }
 }

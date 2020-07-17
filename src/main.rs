@@ -2,7 +2,7 @@ use clap::{App, Arg, SubCommand};
 use dirs;
 use std::error::Error;
 use std::fs;
-use vocabulist_rs::Config;
+use vocabulist_rs::config::Config;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let match_list = App::new("Vocabulist")
@@ -133,13 +133,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         false => {
-            home_path = std::env::current_exe()?.parent().unwrap().to_path_buf();
-            config_directory_path = home_path.clone();
+            home_path = dirs::home_dir().expect("Failed to get home directory");
+            config_directory_path = home_path.join(".vocabulist_rs_dev");
             config_path = config_directory_path.join("config.toml");
+
+            if !config_directory_path.is_dir() {
+                fs::create_dir_all(&config_directory_path)?;
+            }
 
             println!("WARNINGWARNINGWARNINGWARNINGWARNING");
             println!("WARNINGWARNINGWARNINGWARNINGWARNING");
-            println!("Using target/deb as home directory.");
+            println!("Using {} as home directory.", config_directory_path.to_str().unwrap());
             println!("WARNINGWARNINGWARNINGWARNINGWARNING");
             println!("WARNINGWARNINGWARNINGWARNINGWARNING");
         }
@@ -152,7 +156,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         false => {
             let config = Config::default(config_directory_path);
-            toml_string = toml::to_string(&config).unwrap();
+
+            println!("{:?}", config);
+
+            toml_string = toml::to_string(&config)?;
 
             fs::write(config_path, &toml_string)?;
         }

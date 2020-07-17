@@ -5,150 +5,28 @@ mod expression;
 mod posconverter;
 mod progress_bar;
 mod tokenizer;
+pub mod config;
 
 use clap::ArgMatches;
 use expression::Expression;
 use itertools::Itertools;
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tokenizer::jumanpp::Jumanpp;
+use tokenizer::mecab::Mecab;
 use tokenizer::token::Token;
-use tokenizer::Tokenizer;
+use tokenizer::tokenize::Tokenize;
+use tokenizer::{Tokenizer};
+use config::Config;
 
-pub struct Preference {
-    pub database_path: String,
-    pub dictionary_path: String,
-    pub audio: bool,
-}
+// pub struct Preference {
+//     pub database_path: String,
+//     pub dictionary_path: String,
+//     pub audio: bool,
+// }
 
-#[derive(Deserialize, Serialize)]
-pub struct Config {
-    database_path: String,
-    dictionary_path: String,
-    anki: AnkiConnect,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct AnkiConnect {
-    deck_name: String,
-    model_name: String,
-    allow_duplicates: bool,
-    duplicate_scope: String,
-    audio: bool,
-    fields: Vec<Vec<String>>,
-    tags: Vec<String>,
-}
-
-impl Config {
-    pub fn new(database_path: String, dictionary_path: String, anki: AnkiConnect) -> Config {
-        Config {
-            database_path,
-            dictionary_path,
-            anki,
-        }
-    }
-
-    pub fn default(config_directory_path: PathBuf) -> Config {
-        let deck_name = "Default".to_string();
-        let model_name = "Basic".to_string();
-        let allow_duplicates = false;
-        let duplicate_scope = "deck".to_string();
-        let audio = false;
-        let fields = vec![
-            vec!["Front".to_string(), "Back".to_string()],
-            vec!["expression".to_string(), "definition".to_string()],
-        ];
-        let tags = vec!["vocabulist".to_string()];
-        let anki = AnkiConnect::new(
-            deck_name,
-            model_name,
-            allow_duplicates,
-            duplicate_scope,
-            audio,
-            fields,
-            tags,
-        );
-
-        Config {
-            database_path: config_directory_path
-                .join("vocabulist_rs.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
-            dictionary_path: config_directory_path
-                .join("jmdict.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
-            anki: anki,
-        }
-    }
-
-    fn database_path(&self) -> &str {
-        &self.database_path
-    }
-
-    fn dictionary_path(&self) -> &str {
-        &self.dictionary_path
-    }
-
-    fn anki(&self) -> &AnkiConnect {
-        &self.anki
-    }
-}
-
-impl AnkiConnect {
-    pub fn new(
-        deck_name: String,
-        model_name: String,
-        allow_duplicates: bool,
-        duplicate_scope: String,
-        audio: bool,
-        fields: Vec<Vec<String>>,
-        tags: Vec<String>,
-    ) -> AnkiConnect {
-        AnkiConnect {
-            deck_name,
-            model_name,
-            allow_duplicates,
-            duplicate_scope,
-            audio,
-            fields,
-            tags,
-        }
-    }
-
-    fn deck_name(&self) -> &str {
-        &self.deck_name
-    }
-
-    fn model_name(&self) -> &str {
-        &self.model_name
-    }
-
-    fn allow_duplicates(&self) -> bool {
-        self.allow_duplicates
-    }
-
-    fn duplicate_scope(&self) -> &str {
-        &self.duplicate_scope
-    }
-
-    fn audio(&self) -> bool {
-        self.audio
-    }
-
-    fn fields(&self) -> &Vec<Vec<String>> {
-        &self.fields
-    }
-
-    fn tags(&self) -> &Vec<String> {
-        &self.tags
-    }
-}
 
 /// Open a file and clean the contents
 fn open_file(path: &str) -> Vec<String> {
@@ -303,16 +181,28 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let database_path = p.database_path();
     let mut conn = database::connect(database_path);
 
+    let backend_string = p.backend();
     let path = Path::new(m.value_of("path").unwrap());
 
-    fn import_file(conn: &mut Connection, path: &str) -> Result<(), Box<dyn Error>> {
+    fn import_file(conn: &mut Connection, path: &str, backend: &str) -> Result<(), Box<dyn Error>> {
         let sentence_list = open_file(path);
 
         let len = sentence_list.len() as u64;
         let pb = progress_bar::new(len, "Tokenizing");
         let mut callback = || pb.inc(1);
-        let jumanpp = Jumanpp::new(PathBuf::from("jumanpp"));
-        let tokenizer = Tokenizer::new(jumanpp);
+
+        // get the tokenizer backend
+        let backend: Box<dyn Tokenize>  = match backend {
+            "jumanpp" => {
+                Box::new(Jumanpp::new(PathBuf::from("jumanpp")))
+            },
+            _ => {
+                Box::new(Mecab::new(PathBuf::from("mecab")))
+            }
+        };
+
+        let tokenizer = Tokenizer::new(backend);
+
         let expression_list =
             token_list_to_expression_list(tokenizer.tokenize(&sentence_list, &mut callback)?);
         pb.finish_with_message("Tokenized");
@@ -337,14 +227,14 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         for path in fs::read_dir(path).expect("Could not get file list") {
             if let Ok(file) = path {
                 println!("Importing {}", &file.path().to_str().unwrap());
-                import_file(&mut conn, &file.path().to_str().unwrap())?;
+                import_file(&mut conn, &file.path().to_str().unwrap(), backend_string)?;
                 println!("");
             }
         }
     } else {
         if let Some(file) = path.to_str() {
             println!("Importing {}", file);
-            import_file(&mut conn, file)?;
+            import_file(&mut conn, file, backend_string)?;
             println!("");
         }
     }

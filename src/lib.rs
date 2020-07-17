@@ -15,7 +15,8 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tokenizer::jumanpp::Jumanpp;
-use tokenizer::{Token, Tokenizer};
+use tokenizer::token::Token;
+use tokenizer::Tokenizer;
 
 pub struct Preference {
     pub database_path: String,
@@ -304,15 +305,16 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     let path = Path::new(m.value_of("path").unwrap());
 
-    fn import_file(conn: &mut Connection, path: &str) {
+    fn import_file(conn: &mut Connection, path: &str) -> Result<(), Box<dyn Error>> {
         let sentence_list = open_file(path);
 
         let len = sentence_list.len() as u64;
         let pb = progress_bar::new(len, "Tokenizing");
-        let jumanpp = Jumanpp::new();
-        let expression_list = token_list_to_expression_list(
-            jumanpp.tokenize_sentence_list(&sentence_list, &|| pb.inc(1)),
-        );
+        let mut callback = || pb.inc(1);
+        let jumanpp = Jumanpp::new(PathBuf::from("jumanpp"));
+        let tokenizer = Tokenizer::new(jumanpp);
+        let expression_list =
+            token_list_to_expression_list(tokenizer.tokenize(&sentence_list, &mut callback)?);
         pb.finish_with_message("Tokenized");
 
         let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
@@ -326,6 +328,8 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             .expect("Failed to insert expression");
 
         pb.finish_with_message("Imported");
+
+        Ok(())
     }
 
     if path.is_dir() {
@@ -333,14 +337,14 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         for path in fs::read_dir(path).expect("Could not get file list") {
             if let Ok(file) = path {
                 println!("Importing {}", &file.path().to_str().unwrap());
-                import_file(&mut conn, &file.path().to_str().unwrap());
+                import_file(&mut conn, &file.path().to_str().unwrap())?;
                 println!("");
             }
         }
     } else {
         if let Some(file) = path.to_str() {
             println!("Importing {}", file);
-            import_file(&mut conn, file);
+            import_file(&mut conn, file)?;
             println!("");
         }
     }

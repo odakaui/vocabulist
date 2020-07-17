@@ -1,4 +1,5 @@
 pub mod jumanpp;
+pub mod mecab;
 pub mod token;
 pub mod tokenize;
 

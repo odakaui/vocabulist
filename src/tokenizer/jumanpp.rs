@@ -122,7 +122,9 @@ mod tests {
         let sentence = "魅力がたっぷりと詰まっている";
         let jumanpp = Jumanpp::new(PathBuf::from("jumanpp"));
 
-        let token_list = jumanpp.tokenize(sentence).expect("Failed to tokenize sentence");
+        let token_list = jumanpp
+            .tokenize(sentence)
+            .expect("Failed to tokenize sentence");
 
         assert_eq!(token_list, expected_token_list());
     }

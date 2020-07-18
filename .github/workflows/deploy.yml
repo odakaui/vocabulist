@@ -42,7 +42,7 @@ jobs:
       run: cargo build --verbose --release --workspace --target $TARGET
       
     - name: Set Tag
-      run: echo "::set-env name=TAG::${{ github.ref }}"
+      run: echo "::set-env name=TAG::${{ github.event.release.tag_name }}"
       
     - name: Package Release Linux 
       run: |

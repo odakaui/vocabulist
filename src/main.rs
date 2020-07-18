@@ -68,7 +68,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
         )
         .subcommand(SubCommand::with_name("sync").about("sync database with anki"))
-        .subcommand(SubCommand::with_name("config").about("generate configuration")
+        .subcommand(
+            SubCommand::with_name("config")
+                .about("generate configuration")
                 .arg(
                     Arg::with_name("homebrew")
                         .long("homebrew")
@@ -79,7 +81,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .short("f")
                         .long("force")
                         .help("Overwrite existing config"),
-                ))
+                ),
+        )
         .subcommand(
             SubCommand::with_name("list")
                 .about("list vocabulary")
@@ -140,15 +143,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         true => {
             config_directory = home_path.join(".vocabulist_rs");
             config_file = config_directory.join("config.toml");
-
-        },
+        }
         // path for dev
         false => {
             config_directory = home_path.join(".vocabulist_rs_dev");
             config_file = config_directory.join("config.toml");
 
             println!("WARNING: Running in developer mode.");
-            println!("WARNING: Using {} as home directory.", config_directory.to_str().unwrap());
+            println!(
+                "WARNING: Using {} as home directory.",
+                config_directory.to_str().unwrap()
+            );
             println!("");
         }
     }
@@ -159,10 +164,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     match config_file.is_file() {
         true => {
             toml = fs::read_to_string(config_file)?;
-        },
+        }
         false => {
             toml = String::new();
-
 
             let config = Config::default(config_directory);
 
@@ -175,7 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     println!("To create a configuration file run `vocabulist_rs config`");
 
                     Ok(())
-                },
+                }
             }?;
 
             std::process::exit(0);

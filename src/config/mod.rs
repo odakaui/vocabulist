@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use std::path::{PathBuf};
 use super::VERSION;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 const DATABASE: &str = "vocabulist_rs.db";
 const DICTIONARY: &str = "jmdict.db";
@@ -59,7 +59,10 @@ impl Config {
     }
 
     pub fn homebrew(configuration_path: PathBuf) -> Config {
-        let dictionary_path = PathBuf::from(format!("/usr/local/Cellar/vocabulist/{}/share/{}", VERSION, DICTIONARY));
+        let dictionary_path = PathBuf::from(format!(
+            "/usr/local/Cellar/vocabulist/{}/share/{}",
+            VERSION, DICTIONARY
+        ));
         let database_path = configuration_path.join(DATABASE);
         let deck_name = "Default".to_string();
         let model_name = "Basic".to_string();

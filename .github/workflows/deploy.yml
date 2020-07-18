@@ -76,12 +76,12 @@ jobs:
         release_name: Release ${{ github.ref }}
 
     - name: Upload the Assets
-        id: upload_assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: $HOME/${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
-          asset_name: ${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
-          asset_content_type: application/zip
+      id: upload_assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} 
+        asset_path: $HOME/${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
+        asset_name: ${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
+        asset_content_type: application/zip

@@ -41,31 +41,26 @@ jobs:
     - name: Build Release
       run: cargo build --verbose --release --workspace --target $TARGET
       
-    - name: Make Staging Directory MacOS
-      if: runner.os == 'macos-latest'
-      run: echo "::set-env name=STAGE_PATH::$(mktemp -d -t tmp)"
-    
-    - name: Make Staging Directory Linux
-      if: runner.os == 'ubuntu-latest'
-      run: echo "::set-env name=STAGE_PATH::$(mktemp -d)"
-      
     - name: Set Tag
       run: echo "::set-env name=TAG::${{ github.ref }}"
       
     - name: Package Release Linux 
       run: |
-        src="$(pwd)"
+        src_path="$(pwd)"
+        stage_path="staging_directory"
+        package_path="$stage_path/$NAME"
+        package="$NAME"
         
-        mkdir $STAGE_PATH/$NAME
+        mkdir $package_path
         
-        cp target/$TARGET/release/$BINARY_NAME $STAGE_PATH/$NAME
-        cp jmdict.db $STAGE_PATH/$NAME
-        cp ACKNOWLEDGEMENTS.md $STAGE_PATH/$NAME
-        cp LICENSE.md $STAGE_PATH/$NAME
+        cp target/$TARGET/release/$BINARY_NAME $package_path
+        cp jmdict.db $package_path
+        cp ACKNOWLEDGEMENTS.md $package_path
+        cp LICENSE.md $package_path
         
-        cd $STAGE_PATH
+        cd $stage_path
         
-        tar czf "$src/$NAME-$TAG-$TARGET.tar.gz" $NAME
+        tar czf "$src/$NAME-$TAG-$TARGET.tar.gz" $package
     
     - name: Create a Release
       uses: actions/create-release@v1

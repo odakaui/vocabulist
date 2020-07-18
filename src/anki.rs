@@ -1,7 +1,7 @@
-use std::error::Error;
-use std::collections::HashMap;
-use serde_json::{Value, json};
 use crate::Config;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::error::Error;
 
 fn request(action: String, params: Value) -> Value {
     json!({"action": action, "params": params, "version": 6})
@@ -11,7 +11,8 @@ fn invoke(action: String, params: Value) -> Result<Value, Box<dyn Error>> {
     let request_json = request(action, params);
 
     let client = reqwest::blocking::Client::new();
-    let response = client.post("http://localhost:8765")
+    let response = client
+        .post("http://localhost:8765")
         .body(request_json.to_string())
         .send()?
         .text()?;
@@ -24,10 +25,13 @@ fn invoke(action: String, params: Value) -> Result<Value, Box<dyn Error>> {
 }
 
 fn url_for_expression(expression: &str, reading: &str) -> (String, String) {
-        let url_string = format!("https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={}&kana={}", expression, reading);
-        let file_string = format!("vocabulist_{}_{}", expression, reading);
+    let url_string = format!(
+        "https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji={}&kana={}",
+        expression, reading
+    );
+    let file_string = format!("vocabulist_{}_{}", expression, reading);
 
-        (url_string, file_string)
+    (url_string, file_string)
 }
 
 fn verify_fields(field_list: &Vec<Vec<String>>) {
@@ -43,7 +47,13 @@ fn verify_fields(field_list: &Vec<Vec<String>>) {
     }
 }
 
-fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &str, reading: &str, sentence: &str) -> Value {
+fn create_fields(
+    field_list: &Vec<Vec<String>>,
+    definition: &str,
+    expression: &str,
+    reading: &str,
+    sentence: &str,
+) -> Value {
     verify_fields(field_list);
     let field_value_iter = field_list[0].iter().zip(field_list[1].iter());
 
@@ -54,18 +64,18 @@ fn create_fields(field_list: &Vec<Vec<String>>, definition: &str, expression: &s
     }
 
     let mut audio_field_list: Vec<String> = Vec::new();
-    let mut field_map: HashMap<String, String> = HashMap::new(); 
+    let mut field_map: HashMap<String, String> = HashMap::new();
     for (f, v) in field_value_iter {
         let value = match &v.to_lowercase()[..] {
             "audio" => {
                 audio_field_list.push(f.to_string());
                 ""
-            },
+            }
             "definition" => definition,
             "expression" => expression,
             "reading" => reading,
             "sentence" => sentence,
-            _ => ""
+            _ => "",
         };
 
         field_map.insert(f.to_string(), value.to_string());
@@ -99,11 +109,11 @@ fn create_audio_list(audio_fields: &Value, url_list: &Vec<(String, String)>) -> 
     let mut audio_list: Vec<Value> = Vec::new();
     for (url, file_name) in url_list.iter() {
         let audio = json!({
-                "url": url,
-                "filename": file_name,
-                "skipHash": "7e2c2f954ef6051373ba916f000168dc",
-                "fields": audio_fields
-            });
+            "url": url,
+            "filename": file_name,
+            "skipHash": "7e2c2f954ef6051373ba916f000168dc",
+            "fields": audio_fields
+        });
 
         audio_list.push(audio);
     }
@@ -111,7 +121,14 @@ fn create_audio_list(audio_fields: &Value, url_list: &Vec<(String, String)>) -> 
     audio_list
 }
 
-fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Value {
+fn create_note(
+    p: &Config,
+    definition: &str,
+    expression: &str,
+    reading: &str,
+    sentence: &str,
+    url_list: &Vec<(String, String)>,
+) -> Value {
     let anki = p.anki();
     let field_list = anki.fields();
 
@@ -140,7 +157,10 @@ fn create_note(p: &Config, definition: &str, expression: &str, reading: &str, se
 }
 
 fn note_id_list(p: &Config) -> Result<Vec<Value>, Box<dyn Error>> {
-    let result = invoke("findNotes".to_string(), json!({ "query": format!("deck:\"{}\"", p.anki().deck_name())}))?;
+    let result = invoke(
+        "findNotes".to_string(),
+        json!({ "query": format!("deck:\"{}\"", p.anki().deck_name()) }),
+    )?;
 
     if !result["result"].is_array() {
         panic!("Response from Anki Connect does not contain an note id array");
@@ -169,7 +189,10 @@ fn note_info_list_for_id_list(id_list: &Vec<Value>) -> Result<Vec<Value>, Box<dy
     Ok(info_list)
 }
 
-fn expression_list_for_info_list(p: &Config, info_list: &Vec<Value>) -> Result<Vec<String>, Box<dyn Error>> {
+fn expression_list_for_info_list(
+    p: &Config,
+    info_list: &Vec<Value>,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let fields = p.anki().fields();
     verify_fields(fields);
     let field_value_iter = fields[0].iter().zip(fields[1].iter());
@@ -178,7 +201,7 @@ fn expression_list_for_info_list(p: &Config, info_list: &Vec<Value>) -> Result<V
     for (f, v) in field_value_iter {
         if v.to_lowercase() == "expression" {
             expression_field = f.to_string();
-            break
+            break;
         }
     }
 
@@ -189,14 +212,16 @@ fn expression_list_for_info_list(p: &Config, info_list: &Vec<Value>) -> Result<V
                 let note = note.as_object().unwrap();
                 let fields = note["fields"].as_object().unwrap();
                 let expression = fields[&expression_field].as_object().unwrap()["value"]
-                    .as_str().unwrap().to_string();
+                    .as_str()
+                    .unwrap()
+                    .to_string();
 
                 expression_list.push(expression);
-            },
-            false => panic!("Invalid note in info_list")
+            }
+            false => panic!("Invalid note in info_list"),
         }
     }
-    
+
     Ok(expression_list)
 }
 
@@ -214,13 +239,19 @@ pub fn create_url_list(expression: &str, reading_list: &Vec<String>) -> Vec<(Str
     url_list
 }
 
-pub fn insert_note(p: &Config, definition: &str, expression: &str, reading: &str, sentence: &str, url_list: &Vec<(String, String)>) -> Result<(), Box<dyn Error>> {
+pub fn insert_note(
+    p: &Config,
+    definition: &str,
+    expression: &str,
+    reading: &str,
+    sentence: &str,
+    url_list: &Vec<(String, String)>,
+) -> Result<(), Box<dyn Error>> {
     let params = create_note(p, definition, expression, reading, sentence, url_list);
     invoke("addNote".to_string(), params)?;
 
     Ok(())
 }
-
 
 pub fn expression_list(p: &Config) -> Result<Vec<String>, Box<dyn Error>> {
     let id_list = note_id_list(&p)?;
@@ -234,9 +265,14 @@ pub fn expression_list(p: &Config) -> Result<Vec<String>, Box<dyn Error>> {
 mod tests {
     use super::*;
 
-    fn field_map(definition: String, expression: String, reading: String, sentence: String) -> Value {
+    fn field_map(
+        definition: String,
+        expression: String,
+        reading: String,
+        sentence: String,
+    ) -> Value {
         let mut field_map: HashMap<String, String> = HashMap::new();
-        
+
         field_map.insert("Expression".to_string(), expression);
         field_map.insert("Reading".to_string(), reading);
         field_map.insert("Definition".to_string(), definition);
@@ -247,43 +283,103 @@ mod tests {
 
     #[test]
     fn create_fields_all_information() {
-        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+        let field_list = vec![
+            vec![
+                "Expression".to_string(),
+                "Reading".to_string(),
+                "Definition".to_string(),
+                "Sentence".to_string(),
+            ],
+            vec![
+                "expression".to_string(),
+                "reading".to_string(),
+                "definition".to_string(),
+                "sentence".to_string(),
+            ],
+        ];
 
         let expression = "塩".to_string();
         let reading = "しお".to_string();
         let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
         let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
 
-        let fields = field_map(definition.clone(), expression.clone(), reading.clone(), sentence.clone());
+        let fields = field_map(
+            definition.clone(),
+            expression.clone(),
+            reading.clone(),
+            sentence.clone(),
+        );
 
-        assert_eq!(create_fields(&field_list, &definition, &expression, &reading, &sentence), fields);
+        assert_eq!(
+            create_fields(&field_list, &definition, &expression, &reading, &sentence),
+            fields
+        );
     }
 
     #[test]
     fn create_fields_no_reading() {
-        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+        let field_list = vec![
+            vec![
+                "Expression".to_string(),
+                "Reading".to_string(),
+                "Definition".to_string(),
+                "Sentence".to_string(),
+            ],
+            vec![
+                "expression".to_string(),
+                "reading".to_string(),
+                "definition".to_string(),
+                "sentence".to_string(),
+            ],
+        ];
 
         let expression = "塩".to_string();
         let reading = "".to_string();
         let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
         let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
 
-        let fields = field_map(definition.clone(), expression.clone(), expression.clone(), sentence.clone());
+        let fields = field_map(
+            definition.clone(),
+            expression.clone(),
+            expression.clone(),
+            sentence.clone(),
+        );
 
-        assert_eq!(create_fields(&field_list, &definition, &expression, &reading, &sentence), fields);
+        assert_eq!(
+            create_fields(&field_list, &definition, &expression, &reading, &sentence),
+            fields
+        );
     }
 
     #[test]
     #[should_panic]
     fn create_fields_should_panic() {
-        let field_list = vec![vec!["Expression".to_string(), "Reading".to_string(), "Definition".to_string(), "Sentence".to_string()], vec!["expression".to_string(), "reading".to_string(), "definition".to_string(), "sentence".to_string()]];
+        let field_list = vec![
+            vec![
+                "Expression".to_string(),
+                "Reading".to_string(),
+                "Definition".to_string(),
+                "Sentence".to_string(),
+            ],
+            vec![
+                "expression".to_string(),
+                "reading".to_string(),
+                "definition".to_string(),
+                "sentence".to_string(),
+            ],
+        ];
 
         let expression = "塩".to_string();
         let reading = "しお".to_string();
         let definition = "salt (i.e. sodium chloride); common salt; table salt".to_string();
         let sentence = "ここのソースは舐めてみるとちょっと塩っぱい".to_string();
 
-        let fields = field_map(definition.clone(), expression.clone(), reading.clone(), sentence.clone());
+        let fields = field_map(
+            definition.clone(),
+            expression.clone(),
+            reading.clone(),
+            sentence.clone(),
+        );
 
         assert_eq!(create_fields(&field_list, "", "", "", ""), fields);
     }

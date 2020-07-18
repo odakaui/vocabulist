@@ -1,11 +1,11 @@
-use std::error::Error;
+use crate::Expression;
 use rusqlite::{params, Connection};
-use crate::{Expression};
+use std::error::Error;
 
 #[macro_use]
 /// sql!(update_in_anki_for_expression, query, params=[tx: &Transaction, expression: &str, in_anki: bool])
 macro_rules! sql {
-    ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty]) => { 
+    ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty]) => {
         pub fn $fn_name($conn: $conn_type)  -> Result<(), Box<dyn Error>> {
             let query = $query;
 
@@ -14,7 +14,7 @@ macro_rules! sql {
             Ok(())
         }
     };
-    ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty, $($param:ident:$type:ty),+]) => { 
+    ($fn_name:ident, $query:expr, params=[$conn:ident:$conn_type:ty, $($param:ident:$type:ty),+]) => {
         pub fn $fn_name($conn: $conn_type, $($param: $type),+)  -> Result<(), Box<dyn Error>> {
             let params = params![$($param),+];
             let query = $query;
@@ -26,7 +26,7 @@ macro_rules! sql {
     }
 }
 
-mod query; 
+mod query;
 
 /// Setup the database.
 ///
@@ -65,7 +65,10 @@ pub fn connect(path: &str) -> Connection {
 /// * `sentence_list` - A Vec<String> of sentences that have already been imported
 /// * `expression_list` - A list of Expression objects
 
-pub fn filter_imported_expression_list(sentence_list: &Vec<String>, expression_list: Vec<Expression>) -> Vec<Expression> {
+pub fn filter_imported_expression_list(
+    sentence_list: &Vec<String>,
+    expression_list: Vec<Expression>,
+) -> Vec<Expression> {
     let mut tmp_expression_list: Vec<Expression> = Vec::new();
     for expression in expression_list.into_iter() {
         let mut is_duplicate = false;
@@ -73,7 +76,7 @@ pub fn filter_imported_expression_list(sentence_list: &Vec<String>, expression_l
             let sentence_string = &expression.get_sentence()[0];
             if sentence_string == sentence {
                 is_duplicate = true;
-                break
+                break;
             }
         }
 
@@ -86,7 +89,10 @@ pub fn filter_imported_expression_list(sentence_list: &Vec<String>, expression_l
 }
 
 /// Create a list of sentences that have already been imported and that are in sentence_list.
-pub fn select_imported_sentence_list(conn: &Connection, sentence_list: &Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_imported_sentence_list(
+    conn: &Connection,
+    sentence_list: &Vec<String>,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let mut duplicate_sentence_list: Vec<String> = Vec::new();
     for sentence in sentence_list.iter() {
         if query::sentence::exists(conn, sentence)? {
@@ -104,7 +110,11 @@ pub fn select_imported_sentence_list(conn: &Connection, sentence_list: &Vec<Stri
 /// * `expression_list` - The Expression objects to add to the database
 /// * `callback` - A function that is called after each expression is inserted
 
-pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expression>, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
+pub fn insert_expression_list(
+    conn: &mut Connection,
+    expression_list: Vec<Expression>,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
     let tx = conn.transaction()?;
 
     for expression in expression_list.iter() {
@@ -112,7 +122,7 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
         let pos_string = &expression.get_pos()[0];
         let sentence_string = &expression.get_sentence()[0];
         let surface_string = &expression.get_surface_string()[0];
-            
+
         query::expression::insert(&tx, expression_string)?;
         query::pos::insert(&tx, pos_string)?;
         query::sentence::insert(&tx, sentence_string)?;
@@ -133,7 +143,14 @@ pub fn insert_expression_list(conn: &mut Connection, expression_list: Vec<Expres
     Ok(())
 }
 
-fn create_select_query(in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, max: i32) -> String {
+fn create_select_query(
+    in_anki: bool,
+    is_excluded: bool,
+    is_learned: bool,
+    order_by: &str,
+    is_asc: bool,
+    max: i32,
+) -> String {
     let mut query = "SELECT expression FROM expressions ".to_string();
 
     if !(in_anki && is_excluded && is_learned) {
@@ -146,7 +163,7 @@ fn create_select_query(in_anki: bool, is_excluded: bool, is_learned: bool, order
                 query.push_str("AND ");
             }
         }
-         
+
         if !is_excluded {
             query.push_str("is_excluded = 0 ");
 
@@ -165,12 +182,12 @@ fn create_select_query(in_anki: bool, is_excluded: bool, is_learned: bool, order
     match order_by {
         "id" => query.push_str("id "),
         "expression" => query.push_str("expression "),
-        _ => query.push_str("frequency ")
+        _ => query.push_str("frequency "),
     }
 
     match is_asc {
         true => query.push_str("ASC "),
-        false => query.push_str("DESC ")
+        false => query.push_str("DESC "),
     }
 
     if max > -1 {
@@ -185,15 +202,23 @@ fn create_select_query(in_anki: bool, is_excluded: bool, is_learned: bool, order
 ///
 ///
 ///
-pub fn select_expression_list(conn: &Connection, in_anki: bool, is_excluded: bool, is_learned: bool, order_by: &str, is_asc: bool, limit: i32) -> Result<Vec<Expression>, Box<dyn Error>> {
+pub fn select_expression_list(
+    conn: &Connection,
+    in_anki: bool,
+    is_excluded: bool,
+    is_learned: bool,
+    order_by: &str,
+    is_asc: bool,
+    limit: i32,
+) -> Result<Vec<Expression>, Box<dyn Error>> {
     let query = create_select_query(in_anki, is_excluded, is_learned, order_by, is_asc, limit);
 
     let mut select_expression = conn.prepare(&query)?;
 
     let tmp_list = select_expression.query_map(params![], |row| {
-            let expression: String = row.get(0)?;
-            Ok(Expression::new(expression))
-            })?;
+        let expression: String = row.get(0)?;
+        Ok(Expression::new(expression))
+    })?;
 
     let mut expression_list: Vec<Expression> = Vec::new();
     for expression in tmp_list {
@@ -205,8 +230,12 @@ pub fn select_expression_list(conn: &Connection, in_anki: bool, is_excluded: boo
     Ok(expression_list)
 }
 
-
-pub fn update_is_excluded_for_expression_list(conn: &mut Connection, expression_list: &Vec<Expression>, is_excluded: bool, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
+pub fn update_is_excluded_for_expression_list(
+    conn: &mut Connection,
+    expression_list: &Vec<Expression>,
+    is_excluded: bool,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
     let tx = conn.transaction()?;
 
     for expression in expression_list {
@@ -224,39 +253,54 @@ const SELECT_POS_FOR_EXPRESSION: &str = "SELECT pos FROM pos JOIN expressions_po
 
 const SELECT_SENTENCE_FOR_EXPRESSION: &str = "SELECT sentence FROM sentences JOIN expressions_pos_sentences_surface_strings ON sentence_id = sentences.id JOIN expressions ON expressions.id = expression_id WHERE expression = ?;";
 
-const UPDATE_IN_ANKI_FOR_EXPRESSION: &str = "UPDATE expressions SET in_anki = ? WHERE expression = ?;";
+const UPDATE_IN_ANKI_FOR_EXPRESSION: &str =
+    "UPDATE expressions SET in_anki = ? WHERE expression = ?;";
 
 const RESET_IN_ANKI: &str = "UPDATE expressions SET in_anki = 0 WHERE in_anki = 1;";
 
 const UPDATE_IS_EXCLUDED_FOR_POS: &str = "UPDATE pos SET is_excluded = ?2 WHERE pos = ?1;";
 
-const UPDATE_IS_EXCLUDED_FOR_EXPRESSION: &str = "UPDATE expressions SET is_excluded = ?2 WHERE expression = ?1;";
+const UPDATE_IS_EXCLUDED_FOR_EXPRESSION: &str =
+    "UPDATE expressions SET is_excluded = ?2 WHERE expression = ?1;";
 
 const SELECT_EXPRESSION_LIST_FOR_POS: &str = "SELECT expression FROM expressions JOIN expressions_pos_sentences_surface_strings ON expression_id = expressions.id JOIN pos ON pos.id = pos_id WHERE pos = ?;";
-                                            
-pub fn select_pos_for_expression(conn: &Connection, expression: &str) -> Result<Vec<String>, Box<dyn Error>> {
+
+pub fn select_pos_for_expression(
+    conn: &Connection,
+    expression: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let params = params![expression];
     let mut statement = conn.prepare(SELECT_POS_FOR_EXPRESSION)?;
 
-    let pos_list: Vec<String> = statement.query_map(params, |row| Ok(row.get(0)?))?
+    let pos_list: Vec<String> = statement
+        .query_map(params, |row| Ok(row.get(0)?))?
         .map(|x| x.unwrap())
         .collect();
 
     Ok(pos_list)
 }
 
-pub fn select_sentence_for_expression(conn: &Connection, expression: &str) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_sentence_for_expression(
+    conn: &Connection,
+    expression: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let params = params![expression];
     let mut statement = conn.prepare(SELECT_SENTENCE_FOR_EXPRESSION)?;
 
-    let sentence_list: Vec<String> = statement.query_map(params, |row| Ok(row.get(0)?))?
+    let sentence_list: Vec<String> = statement
+        .query_map(params, |row| Ok(row.get(0)?))?
         .map(|x| x.unwrap())
         .collect();
 
     Ok(sentence_list)
 }
 
-pub fn select_pos_list(conn: &Connection, is_excluded: bool, is_asc: bool, limit: i32) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_pos_list(
+    conn: &Connection,
+    is_excluded: bool,
+    is_asc: bool,
+    limit: i32,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let mut query = "SELECT pos FROM pos ".to_string();
 
     if !is_excluded {
@@ -265,7 +309,7 @@ pub fn select_pos_list(conn: &Connection, is_excluded: bool, is_asc: bool, limit
 
     match is_asc {
         true => query.push_str("ORDER BY pos ASC "),
-        false => query.push_str("ORDER BY pos DESC ")
+        false => query.push_str("ORDER BY pos DESC "),
     }
 
     if limit > -1 {
@@ -274,17 +318,23 @@ pub fn select_pos_list(conn: &Connection, is_excluded: bool, is_asc: bool, limit
 
     let mut statement = conn.prepare(&query)?;
 
-    let pos_list: Vec<String> = statement.query_map(params![], |row| Ok(row.get(0)?))?
+    let pos_list: Vec<String> = statement
+        .query_map(params![], |row| Ok(row.get(0)?))?
         .map(|x| x.unwrap())
         .collect();
 
     Ok(pos_list)
 }
 
-pub fn update_is_excluded_for_pos_list(conn: &mut Connection, pos_list: &Vec<String>, is_excluded: bool, callback: &dyn Fn()) -> Result<(), Box<dyn Error>> {
+pub fn update_is_excluded_for_pos_list(
+    conn: &mut Connection,
+    pos_list: &Vec<String>,
+    is_excluded: bool,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
     let is_excluded = match is_excluded {
         true => 1,
-        false => 0
+        false => 0,
     };
 
     for pos in pos_list.iter() {
@@ -302,21 +352,36 @@ pub fn update_is_excluded_for_pos_list(conn: &mut Connection, pos_list: &Vec<Str
     Ok(())
 }
 
-fn select_expression_list_for_pos(conn: &Connection, pos: &str) -> Result<Vec<String>, Box<dyn Error>> {
+fn select_expression_list_for_pos(
+    conn: &Connection,
+    pos: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let mut statement = conn.prepare(SELECT_EXPRESSION_LIST_FOR_POS)?;
 
-    let expression_list: Vec<String> = statement.query_map(params![pos], |row| Ok(row.get(0)?))?
+    let expression_list: Vec<String> = statement
+        .query_map(params![pos], |row| Ok(row.get(0)?))?
         .map(|x| x.unwrap())
         .collect();
 
     Ok(expression_list)
 }
 
+sql!(
+    update_in_anki_for_expression,
+    UPDATE_IN_ANKI_FOR_EXPRESSION,
+    params = [conn: &Connection, in_anki: u32, expression: &str]
+);
 
-sql!(update_in_anki_for_expression, UPDATE_IN_ANKI_FOR_EXPRESSION, params=[conn: &Connection, in_anki: u32, expression: &str]);
+sql!(reset_in_anki, RESET_IN_ANKI, params = [conn: &Connection]);
 
-sql!(reset_in_anki, RESET_IN_ANKI, params=[conn: &Connection]);
+sql!(
+    update_is_excluded_for_pos,
+    UPDATE_IS_EXCLUDED_FOR_POS,
+    params = [conn: &Connection, pos: &str, is_excluded: i32]
+);
 
-sql!(update_is_excluded_for_pos, UPDATE_IS_EXCLUDED_FOR_POS, params=[conn: &Connection, pos: &str, is_excluded: i32]);
-
-sql!(update_is_excluded_for_expression, UPDATE_IS_EXCLUDED_FOR_EXPRESSION, params=[conn: &Connection, expression: &str, is_excluded: i32]);
+sql!(
+    update_is_excluded_for_expression,
+    UPDATE_IS_EXCLUDED_FOR_EXPRESSION,
+    params = [conn: &Connection, expression: &str, is_excluded: i32]
+);

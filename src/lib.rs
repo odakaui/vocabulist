@@ -1,13 +1,14 @@
 mod anki;
+pub mod config;
 mod database;
 mod dictionary;
 mod expression;
 mod posconverter;
 mod progress_bar;
 mod tokenizer;
-pub mod config;
 
 use clap::ArgMatches;
+use config::Config;
 use expression::Expression;
 use itertools::Itertools;
 use rusqlite::Connection;
@@ -18,8 +19,7 @@ use tokenizer::jumanpp::Jumanpp;
 use tokenizer::mecab::Mecab;
 use tokenizer::token::Token;
 use tokenizer::tokenize::Tokenize;
-use tokenizer::{Tokenizer};
-use config::Config;
+use tokenizer::Tokenizer;
 
 // pub struct Preference {
 //     pub database_path: String,
@@ -193,13 +193,9 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         let mut callback = || pb.inc(1);
 
         // get the tokenizer backend
-        let backend: Box<dyn Tokenize>  = match backend {
-            "jumanpp" => {
-                Box::new(Jumanpp::new(PathBuf::from("jumanpp")))
-            },
-            _ => {
-                Box::new(Mecab::new(PathBuf::from("mecab")))
-            }
+        let backend: Box<dyn Tokenize> = match backend {
+            "jumanpp" => Box::new(Jumanpp::new(PathBuf::from("jumanpp"))),
+            _ => Box::new(Mecab::new(PathBuf::from("mecab"))),
         };
 
         let tokenizer = Tokenizer::new(backend);
@@ -432,7 +428,7 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         true => {
             config_directory = home_path.join(".vocabulist_rs");
             config_file = config_directory.join("config.toml");
-        },
+        }
         // path for dev
         false => {
             config_directory = home_path.join(".vocabulist_rs_dev");
@@ -445,7 +441,10 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             match m.is_present("force") {
                 true => {
                     // create the config file
-                    println!("Creating new configuration file at {}", config_file.to_str().unwrap());
+                    println!(
+                        "Creating new configuration file at {}",
+                        config_file.to_str().unwrap()
+                    );
 
                     // create the directory
                     if !config_directory.is_dir() {
@@ -459,7 +458,7 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
                     let toml = toml::to_string(&config)?;
                     fs::write(config_file, &toml)?;
-                },
+                }
                 false => {
                     println!("Configuration file already exists");
                     println!("Doing nothing");
@@ -467,10 +466,13 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
                     println!("If you would like to overwrite the file run `vocabulist_rs config --force`")
                 }
             }
-        },
+        }
         false => {
             // create the config file
-            println!("Creating new configuration file at {}", config_file.to_str().unwrap());
+            println!(
+                "Creating new configuration file at {}",
+                config_file.to_str().unwrap()
+            );
 
             // create the directory
             if !config_directory.is_dir() {

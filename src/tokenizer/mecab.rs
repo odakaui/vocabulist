@@ -117,7 +117,7 @@ mod tests {
     /// test the tokenize function for the mecab backend
     /// requires:
     ///     mecab, mecab-ipadic-utf8 on ubuntu
-    ///     mecab, mecab-ipadic on mac 
+    ///     mecab, mecab-ipadic on mac
     #[test]
     #[ignore]
     fn test_mecab_tokenize() {

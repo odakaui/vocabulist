@@ -31,11 +31,11 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
     - name: Set Target MacOS
-      if: runner.os == 'macos-latest'
+      if: matrix.os == 'macos-latest'
       run: echo "::set-env name=TARGET::x86_64-apple-darwin"
       
     - name: Set Target Linux
-      if: runner.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-latest'
       run: echo "::set-env name=TARGET::x86_64-unknown-linux-gnu"
     
     - name: Build Release

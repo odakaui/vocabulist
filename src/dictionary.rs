@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, OpenFlags};
 use std::error::Error;
+use std::path::PathBuf;
 
 const SELECT_SENSE_ID_FOR_KEB: &str =   "SELECT sense.id FROM sense INNER JOIN entry ON entry.ent_seq = sense.ent_seq INNER JOIN entry_keb ON entry_keb.ent_seq = entry.ent_seq INNER JOIN keb ON keb.id = entry_keb.keb_id WHERE keb = ?;";
 
@@ -33,7 +34,7 @@ impl DictionaryDefinition {
     }
 }
 
-pub fn connect(path: &str) -> Result<Connection, Box<dyn Error>> {
+pub fn connect(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
     Ok(conn)

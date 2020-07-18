@@ -27,6 +27,7 @@ use config::Config;
 //     pub audio: bool,
 // }
 
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 /// Open a file and clean the contents
 fn open_file(path: &str) -> Vec<String> {
@@ -60,7 +61,7 @@ fn token_list_to_expression_list(token_list: Vec<Token>) -> Vec<Expression> {
     expression_list
 }
 
-fn database_connection(database_path: &str) -> Connection {
+fn database_connection(database_path: &PathBuf) -> Connection {
     database::connect(database_path)
 }
 
@@ -416,6 +417,74 @@ pub fn sync(p: Config, _: &ArgMatches) -> Result<(), Box<dyn Error>> {
     for expression in expression_list.iter() {
         println!("{}", expression);
         database::update_in_anki_for_expression(&conn, 1, expression)?;
+    }
+
+    Ok(())
+}
+
+pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    let config_directory;
+    let config_file;
+    let home_path = dirs::home_dir().expect("Failed to get home directory");
+
+    match !cfg!(debug_assertions) {
+        // path for release
+        true => {
+            config_directory = home_path.join(".vocabulist_rs");
+            config_file = config_directory.join("config.toml");
+        },
+        // path for dev
+        false => {
+            config_directory = home_path.join(".vocabulist_rs_dev");
+            config_file = config_directory.join("config.toml");
+        }
+    }
+
+    match config_file.is_file() {
+        true => {
+            match m.is_present("force") {
+                true => {
+                    // create the config file
+                    println!("Creating new configuration file at {}", config_file.to_str().unwrap());
+
+                    // create the directory
+                    if !config_directory.is_dir() {
+                        fs::create_dir_all(&config_directory)?;
+                    }
+
+                    let config = match m.is_present("homebrew") {
+                        true => Config::homebrew(config_directory),
+                        false => Config::default(config_directory),
+                    };
+
+                    let toml = toml::to_string(&config)?;
+                    fs::write(config_file, &toml)?;
+                },
+                false => {
+                    println!("Configuration file already exists");
+                    println!("Doing nothing");
+                    println!("");
+                    println!("If you would like to overwrite the file run `vocabulist_rs config --force`")
+                }
+            }
+        },
+        false => {
+            // create the config file
+            println!("Creating new configuration file at {}", config_file.to_str().unwrap());
+
+            // create the directory
+            if !config_directory.is_dir() {
+                fs::create_dir_all(&config_directory)?;
+            }
+
+            let config = match m.is_present("homebrew") {
+                true => Config::homebrew(config_directory),
+                false => Config::default(config_directory),
+            };
+
+            let toml = toml::to_string(&config)?;
+            fs::write(config_file, &toml)?;
+        }
     }
 
     Ok(())

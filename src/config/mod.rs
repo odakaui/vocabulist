@@ -1,10 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::path::{PathBuf};
+use super::VERSION;
+
+const DATABASE: &str = "vocabulist_rs.db";
+const DICTIONARY: &str = "jmdict.db";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
-    database_path: String,
-    dictionary_path: String,
+    database_path: PathBuf,
+    dictionary_path: PathBuf,
     backend: String,
     anki: AnkiConnect,
 }
@@ -21,7 +25,10 @@ pub struct AnkiConnect {
 }
 
 impl Config {
-    pub fn default(config_directory_path: PathBuf) -> Config {
+    pub fn default(configuration_path: PathBuf) -> Config {
+        let dictionary_path = configuration_path.join(DICTIONARY);
+        let database_path = configuration_path.join(DATABASE);
+
         let deck_name = "Default".to_string();
         let model_name = "Basic".to_string();
         let allow_duplicates = false;
@@ -44,26 +51,50 @@ impl Config {
         let backend = "mecab".to_string();
 
         Config {
-            database_path: config_directory_path
-                .join("vocabulist_rs.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
-            dictionary_path: config_directory_path
-                .join("jmdict.db")
-                .to_str()
-                .unwrap()
-                .to_string(),
+            database_path: database_path,
+            dictionary_path: dictionary_path,
             anki: anki,
             backend: backend,
         }
     }
 
-    pub fn database_path(&self) -> &str {
+    pub fn homebrew(configuration_path: PathBuf) -> Config {
+        let dictionary_path = PathBuf::from(format!("/usr/local/Cellar/vocabulist/{}/share/{}", VERSION, DICTIONARY));
+        let database_path = configuration_path.join(DATABASE);
+        let deck_name = "Default".to_string();
+        let model_name = "Basic".to_string();
+        let allow_duplicates = false;
+        let duplicate_scope = "deck".to_string();
+        let audio = false;
+        let fields = vec![
+            vec!["Front".to_string(), "Back".to_string()],
+            vec!["expression".to_string(), "definition".to_string()],
+        ];
+        let tags = vec!["vocabulist".to_string()];
+        let anki = AnkiConnect::new(
+            deck_name,
+            model_name,
+            allow_duplicates,
+            duplicate_scope,
+            audio,
+            fields,
+            tags,
+        );
+        let backend = "mecab".to_string();
+
+        Config {
+            database_path: database_path,
+            dictionary_path: dictionary_path,
+            anki: anki,
+            backend: backend,
+        }
+    }
+
+    pub fn database_path(&self) -> &PathBuf {
         &self.database_path
     }
 
-    pub fn dictionary_path(&self) -> &str {
+    pub fn dictionary_path(&self) -> &PathBuf {
         &self.dictionary_path
     }
 

@@ -163,12 +163,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         false => {
             toml = String::new();
 
-            println!("ERROR: Configuration file does not exist.");
-            println!("Exiting.");
-            println!("");
-            println!("To create a configuration file run `vocabulist_rs config`");
 
-            panic!("");
+            let config = Config::default(config_directory);
+
+            match match_list.subcommand() {
+                ("config", Some(m)) => vocabulist_rs::config(config, m),
+                _ => {
+                    println!("ERROR: Configuration file does not exist.");
+                    println!("Exiting.");
+                    println!("");
+                    println!("To create a configuration file run `vocabulist_rs config`");
+
+                    Ok(())
+                },
+            }?;
+
+            std::process::exit(0);
         }
     }
 
@@ -178,7 +188,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("import", Some(m)) => vocabulist_rs::import(config, m),
         ("sync", Some(m)) => vocabulist_rs::sync(config, m),
         ("list", Some(m)) => vocabulist_rs::list(config, m),
-        ("config", Some(m)) => vocabulist_rs::config(config, m),
         ("exclude", Some(m)) => vocabulist_rs::exclude(config, m),
         ("include", Some(m)) => vocabulist_rs::include(config, m),
         ("generate", Some(m)) => vocabulist_rs::generate(config, m),

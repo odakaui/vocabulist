@@ -69,7 +69,7 @@ jobs:
         
         cd $stage_path
         
-        tar czf "${src}/${archive_name}" "${package}"
+        tar czf "${src_path}/${archive_name}" "${package}"
 
         cd $src_path
     

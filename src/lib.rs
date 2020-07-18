@@ -148,7 +148,7 @@ fn format_anki_definition(definition_list: &Vec<Vec<String>>, is_specific_defini
         definition_string.push_str("WARNING: Not filtered by pos.<br>\n");
     }
 
-    if !is_specific_kanji {
+    if !is_specific_kanji && !is_specific_definition {
         definition_string.push_str("WARNING: Not filtered by kanji. <br>\n");
     }
 

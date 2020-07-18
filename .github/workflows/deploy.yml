@@ -68,14 +68,15 @@ jobs:
 
         cd $src_path
     
-    - name: Create a Release
+    - name: Create the Release
       id: create_release
       uses: actions/create-release@v1
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
 
-    - name: Upload the Release Assets
+    - name: Upload the Assets
+        id: upload_assets
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

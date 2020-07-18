@@ -3,14 +3,15 @@ use dirs;
 use std::error::Error;
 use std::fs;
 use vocabulist_rs::config::Config;
+use vocabulist_rs::VERSION;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let match_list = App::new("Vocabulist")
-        .version("0.1")
+        .version(VERSION)
         .author("Odaka Ui <odakaui@example.com>")
         .about("Vocabulary database for learning Japanese")
         .arg(
-            Arg::with_name("config")
+            Arg::with_name(VERSION)
                 .short("c")
                 .long("config")
                 .value_name("PATH")
@@ -67,6 +68,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
         )
         .subcommand(SubCommand::with_name("sync").about("sync database with anki"))
+        .subcommand(SubCommand::with_name("config").about("generate configuration")
+                .arg(
+                    Arg::with_name("homebrew")
+                        .long("homebrew")
+                        .help("Create config file for homebrew install"),
+                )
+                .arg(
+                    Arg::with_name("force")
+                        .short("f")
+                        .long("force")
+                        .help("Overwrite existing config"),
+                ))
         .subcommand(
             SubCommand::with_name("list")
                 .about("list vocabulary")
@@ -118,59 +131,54 @@ fn main() -> Result<(), Box<dyn Error>> {
         .get_matches();
 
     // load the config file
-    let home_path;
-    let config_directory_path;
-    let config_path;
+    let config_directory;
+    let config_file;
+    let home_path = dirs::home_dir().expect("Failed to get home directory");
 
     match !cfg!(debug_assertions) {
+        // path for release
         true => {
-            home_path = dirs::home_dir().expect("Failed to get home directory");
-            config_directory_path = home_path.join(".vocabulist_rs");
-            config_path = config_directory_path.join("config.toml");
+            config_directory = home_path.join(".vocabulist_rs");
+            config_file = config_directory.join("config.toml");
 
-            if !config_directory_path.is_dir() {
-                fs::create_dir_all(&config_directory_path)?;
-            }
-        }
+        },
+        // path for dev
         false => {
-            home_path = dirs::home_dir().expect("Failed to get home directory");
-            config_directory_path = home_path.join(".vocabulist_rs_dev");
-            config_path = config_directory_path.join("config.toml");
+            config_directory = home_path.join(".vocabulist_rs_dev");
+            config_file = config_directory.join("config.toml");
 
-            if !config_directory_path.is_dir() {
-                fs::create_dir_all(&config_directory_path)?;
-            }
-
-            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
-            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
-            println!("Using {} as home directory.", config_directory_path.to_str().unwrap());
-            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
-            println!("WARNINGWARNINGWARNINGWARNINGWARNING");
+            println!("WARNING: Running in developer mode.");
+            println!("WARNING: Using {} as home directory.", config_directory.to_str().unwrap());
+            println!("");
         }
     }
 
-    let toml_string: String;
-    match config_path.is_file() {
+    // check if the config file exists
+    let toml;
+
+    match config_file.is_file() {
         true => {
-            toml_string = fs::read_to_string(config_path)?;
-        }
+            toml = fs::read_to_string(config_file)?;
+        },
         false => {
-            let config = Config::default(config_directory_path);
+            toml = String::new();
 
-            println!("{:?}", config);
+            println!("ERROR: Configuration file does not exist.");
+            println!("Exiting.");
+            println!("");
+            println!("To create a configuration file run `vocabulist_rs config`");
 
-            toml_string = toml::to_string(&config)?;
-
-            fs::write(config_path, &toml_string)?;
+            panic!("");
         }
     }
 
-    let config: Config = toml::from_str(&toml_string)?;
+    let config: Config = toml::from_str(&toml)?;
 
     match match_list.subcommand() {
         ("import", Some(m)) => vocabulist_rs::import(config, m),
         ("sync", Some(m)) => vocabulist_rs::sync(config, m),
         ("list", Some(m)) => vocabulist_rs::list(config, m),
+        ("config", Some(m)) => vocabulist_rs::config(config, m),
         ("exclude", Some(m)) => vocabulist_rs::exclude(config, m),
         ("include", Some(m)) => vocabulist_rs::include(config, m),
         ("generate", Some(m)) => vocabulist_rs::generate(config, m),

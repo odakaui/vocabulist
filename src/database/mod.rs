@@ -1,6 +1,7 @@
 use crate::Expression;
 use rusqlite::{params, Connection};
 use std::error::Error;
+use std::path::PathBuf;
 
 #[macro_use]
 /// sql!(update_in_anki_for_expression, query, params=[tx: &Transaction, expression: &str, in_anki: bool])
@@ -50,7 +51,7 @@ fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
 ///
 /// * `path` - An &str with the file system path to the database
 
-pub fn connect(path: &str) -> Connection {
+pub fn connect(path: &PathBuf) -> Connection {
     let conn = Connection::open(path).expect("Failed to connect to the database");
     initialize(&conn).expect("Failed to initialize database");
 

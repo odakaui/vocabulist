@@ -51,7 +51,7 @@ jobs:
         package_path="$stage_path/$NAME"
         package="$NAME"
         
-        mkdir $package_path
+        mkdir -p $package_path
         
         cp target/$TARGET/release/$BINARY_NAME $package_path
         cp jmdict.db $package_path

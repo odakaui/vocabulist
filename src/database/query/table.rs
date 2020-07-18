@@ -1,9 +1,9 @@
+use rusqlite::{params, Connection};
 use std::error::Error;
-use rusqlite::{Connection, params};
 
 pub fn create_expressions(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
-            "CREATE TABLE IF NOT EXISTS expressions (
+        "CREATE TABLE IF NOT EXISTS expressions (
                 id INTEGER PRIMARY KEY,
                 expression TEXT NOT NULL UNIQUE,
                 frequency DEFAULT 1,
@@ -11,52 +11,54 @@ pub fn create_expressions(conn: &Connection) -> Result<(), Box<dyn Error>> {
                 in_anki INTEGER NOT NULL DEFAULT 0,
                 is_learned INTEGER NOT NULL DEFAULT 0
                 );",
-            params![],
-            )?;
+        params![],
+    )?;
 
     Ok(())
 }
 
 pub fn create_sentences(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
-            "CREATE TABLE IF NOT EXISTS sentences (
+        "CREATE TABLE IF NOT EXISTS sentences (
                 id INTEGER PRIMARY KEY, 
                 sentence TEXT NOT NULL UNIQUE
                 );",
-            params![],
-            )?;
+        params![],
+    )?;
 
     Ok(())
 }
 
 pub fn create_pos(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
-            "CREATE TABLE IF NOT EXISTS pos (
+        "CREATE TABLE IF NOT EXISTS pos (
                 id INTEGER PRIMARY KEY, 
                 pos TEXT NOT NULL UNIQUE, 
                 is_excluded INTEGER NOT NULL DEFAULT 0
                 );",
-            params![],
-            )?;
+        params![],
+    )?;
 
     Ok(())
 }
 
 pub fn create_surface_strings(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
-            "CREATE TABLE IF NOT EXISTS surface_strings (
+        "CREATE TABLE IF NOT EXISTS surface_strings (
                 id INTEGER PRIMARY KEY, 
                 surface_string TEXT NOT NULL UNIQUE
                 );",
-            params![],
-            )?;
+        params![],
+    )?;
 
     Ok(())
 }
 
-pub fn create_expressions_pos_sentences_surface_strings(conn: &Connection) -> Result<(), Box<dyn Error>> {
+pub fn create_expressions_pos_sentences_surface_strings(
+    conn: &Connection,
+) -> Result<(), Box<dyn Error>> {
     conn.execute(
-            "CREATE TABLE IF NOT EXISTS expressions_pos_sentences_surface_strings (
+        "CREATE TABLE IF NOT EXISTS expressions_pos_sentences_surface_strings (
                 pos_id INTEGER, 
                 sentence_id INTEGER, 
                 expression_id INTEGER, 
@@ -79,8 +81,8 @@ pub fn create_expressions_pos_sentences_surface_strings(conn: &Connection) -> Re
                             ON DELETE CASCADE
                             ON UPDATE NO ACTION
                 );",
-            params![],
-            )?;
+        params![],
+    )?;
 
-            Ok(())
+    Ok(())
 }

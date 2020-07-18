@@ -1,6 +1,6 @@
-#[derive(Debug, Clone, Default)]
-pub struct Expression {
-    expression: String,
+#[derive(PartialEq, Debug, Clone, Default)]
+pub struct Token {
+    token: String,
     pos: Vec<String>,
     sentence: Vec<String>,
     surface_string: Vec<String>,
@@ -9,17 +9,17 @@ pub struct Expression {
     definition: Vec<String>,
 }
 
-impl Expression {
-    pub fn new(expression: String) -> Expression {
-        Expression {
-            expression,
+impl Token {
+    pub fn new(token: String) -> Token {
+        Token {
+            token,
             ..Default::default()
         }
     }
 
-    pub fn pos(self, pos: Vec<String>) -> Expression {
-        Expression {
-            expression: self.expression,
+    pub fn pos(self, pos: Vec<String>) -> Token {
+        Token {
+            token: self.token,
             pos: pos,
             sentence: self.sentence,
             surface_string: self.surface_string,
@@ -28,9 +28,9 @@ impl Expression {
         }
     }
 
-    pub fn sentence(self, sentence: Vec<String>) -> Expression {
-        Expression {
-            expression: self.expression,
+    pub fn sentence(self, sentence: Vec<String>) -> Token {
+        Token {
+            token: self.token,
             pos: self.pos,
             sentence: sentence,
             surface_string: self.surface_string,
@@ -39,9 +39,9 @@ impl Expression {
         }
     }
 
-    pub fn surface_string(self, surface_string: Vec<String>) -> Expression {
-        Expression {
-            expression: self.expression,
+    pub fn surface_string(self, surface_string: Vec<String>) -> Token {
+        Token {
+            token: self.token,
             pos: self.pos,
             sentence: self.sentence,
             surface_string: surface_string,
@@ -50,8 +50,8 @@ impl Expression {
         }
     }
 
-    pub fn get_expression(&self) -> &str {
-        &self.expression
+    pub fn get_token(&self) -> &str {
+        &self.token
     }
 
     pub fn get_sentence(&self) -> &Vec<String> {

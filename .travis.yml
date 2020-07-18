@@ -32,6 +32,7 @@ deploy:
     on:
       repo: odakaui/vocabulist
       tags: true
+      branch: master
     skip_cleanup: 'true'
     overwrite: 'true'
   - provider: releases
@@ -42,6 +43,7 @@ deploy:
     on:
       repo: odakaui/vocabulist
       tags: 'false'
+      branch: master
     skip_cleanup: 'true'
     overwrite: 'true'
 

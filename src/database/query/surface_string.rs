@@ -1,12 +1,12 @@
+use rusqlite::{params, Transaction};
 use std::error::Error;
-use rusqlite::{Transaction, params};
 
 /* Surface String Functions */
 
 pub fn insert(tx: &Transaction, string: &str) -> Result<(), Box<dyn Error>> {
     let params = params![string];
     let query = "INSERT OR IGNORE INTO surface_strings (surface_string) VALUES (?);";
-    tx.execute(query, params)?; 
+    tx.execute(query, params)?;
 
     Ok(())
 }

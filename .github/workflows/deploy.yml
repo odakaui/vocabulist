@@ -42,14 +42,18 @@ jobs:
       run: cargo build --verbose --release --workspace --target $TARGET
       
     - name: Set Tag
-      run: echo "::set-env name=TAG::${{ github.event.release.tag_name }}"
+      run: echo "::set-env name=TAG::${{ github.ref }}"
       
     - name: Package Release Linux 
       run: |
-        src_path="$(pwd)"
+        src_path="$HOME"
         stage_path="staging_directory"
         package_path="$stage_path/$NAME"
         package="$NAME"
+
+        tag="$(basename $TAG)"
+
+        cd $src_path    # change into the working directory
         
         mkdir -p $package_path
         
@@ -60,12 +64,23 @@ jobs:
         
         cd $stage_path
         
-        tar czf "$src/$NAME-$TAG-$TARGET.tar.gz" $package
+        tar czf "$src/$NAME-$tag-$TARGET.tar.gz" "$package"
+
+        cd $src_path
     
     - name: Create a Release
+      id: create_release
       uses: actions/create-release@v1
       with:
-        # The name of the tag. This should come from the webhook payload, `github.GITHUB_REF` when a user pushes a new tag
         tag_name: ${{ github.ref }}
-        # The name of the release. For example, `Release v1.0.1`
         release_name: Release ${{ github.ref }}
+
+    - name: Upload the Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: $HOME/${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
+          asset_name: ${{ "$NAME-$(basename $TAG)-$TARGET.tar.gz" }}
+          asset_content_type: application/zip

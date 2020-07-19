@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.7] - 2020-07-19
+
+### Fixed
+
+- Fix default dictionary path
+
 ## [0.1.6] - 2020-07-18
 
 ### Removed

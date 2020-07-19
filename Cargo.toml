@@ -1,6 +1,6 @@
 [package]
 name = "vocabulist_rs"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Odaka Ui <31593320+odakaui@users.noreply.github.com>"]
 edition = "2018"
 

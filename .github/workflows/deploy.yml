@@ -53,6 +53,8 @@ jobs:
         package_path="$stage_path/$NAME"
         package="$NAME"
 
+        share_path="$package_path/$package"
+
         tag="$(basename $TAG)"
 
         archive_name="$NAME-$tag-$TARGET.tar.gz"
@@ -61,9 +63,10 @@ jobs:
         echo "::set-output name=archive_name::${archive_name}"
 
         mkdir -p $package_path
+        mkdir "$share_path"    # /usr/local/share/vocabulist
         
         cp target/$TARGET/release/$BINARY_NAME $package_path
-        cp jmdict.db $package_path
+        cp jmdict.db $share_path
         cp ACKNOWLEDGEMENTS.md $package_path
         cp LICENSE.md $package_path
         

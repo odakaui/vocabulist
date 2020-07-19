@@ -1,19 +1,18 @@
-use super::VERSION;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const DATABASE: &str = "vocabulist_rs.db";
 const DICTIONARY: &str = "jmdict.db";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct Config {
     database_path: PathBuf,
-    dictionary_path: PathBuf,
+    dictionary_path: Option<PathBuf>,
     backend: String,
     anki: AnkiConnect,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct AnkiConnect {
     deck_name: String,
     model_name: String,
@@ -25,9 +24,23 @@ pub struct AnkiConnect {
 }
 
 impl Config {
+    pub fn new(
+        database_path: PathBuf,
+        dictionary_path: Option<PathBuf>,
+        backend: String,
+        anki: AnkiConnect,
+    ) -> Self {
+        Config {
+            database_path,
+            dictionary_path,
+            backend,
+            anki,
+        }
+    }
+
     pub fn default(configuration_path: PathBuf) -> Config {
-        let dictionary_path = configuration_path.join(DICTIONARY);
         let database_path = configuration_path.join(DATABASE);
+        let backend = "mecab".to_string();
 
         let deck_name = "Default".to_string();
         let model_name = "Basic".to_string();
@@ -39,6 +52,7 @@ impl Config {
             vec!["expression".to_string(), "definition".to_string()],
         ];
         let tags = vec!["vocabulist".to_string()];
+
         let anki = AnkiConnect::new(
             deck_name,
             model_name,
@@ -48,22 +62,19 @@ impl Config {
             fields,
             tags,
         );
-        let backend = "mecab".to_string();
 
         Config {
             database_path: database_path,
-            dictionary_path: dictionary_path,
+            dictionary_path: None,
             anki: anki,
             backend: backend,
         }
     }
 
     pub fn homebrew(configuration_path: PathBuf) -> Config {
-        let dictionary_path = PathBuf::from(format!(
-            "/usr/local/Cellar/vocabulist/{}/share/{}",
-            VERSION, DICTIONARY
-        ));
         let database_path = configuration_path.join(DATABASE);
+        let backend = "mecab".to_string();
+
         let deck_name = "Default".to_string();
         let model_name = "Basic".to_string();
         let allow_duplicates = false;
@@ -74,6 +85,7 @@ impl Config {
             vec!["expression".to_string(), "definition".to_string()],
         ];
         let tags = vec!["vocabulist".to_string()];
+
         let anki = AnkiConnect::new(
             deck_name,
             model_name,
@@ -83,11 +95,10 @@ impl Config {
             fields,
             tags,
         );
-        let backend = "mecab".to_string();
 
         Config {
             database_path: database_path,
-            dictionary_path: dictionary_path,
+            dictionary_path: None,
             anki: anki,
             backend: backend,
         }
@@ -97,8 +108,13 @@ impl Config {
         &self.database_path
     }
 
-    pub fn dictionary_path(&self) -> &PathBuf {
-        &self.dictionary_path
+    pub fn dictionary_path(&self) -> PathBuf {
+        let default_path = PathBuf::from(format!("/usr/local/share/vocabulist/{}", DICTIONARY)); // the default dictionary path
+
+        match &self.dictionary_path {
+            Some(path) => path.clone(),
+            None => default_path,
+        }
     }
 
     pub fn anki(&self) -> &AnkiConnect {
@@ -157,5 +173,36 @@ impl AnkiConnect {
 
     pub fn tags(&self) -> &Vec<String> {
         &self.tags
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dictionary_path() {
+        let database_path = PathBuf::from("database");
+        let dictionary_path = PathBuf::from("dictionary");
+        let backend = String::from("mecab");
+
+        let anki: AnkiConnect = Default::default();
+
+        let config = Config::new(database_path, Some(dictionary_path.clone()), backend, anki);
+
+        assert_eq!(config.dictionary_path(), dictionary_path);
+    }
+
+    #[test]
+    fn test_dictionary_path_default() {
+        let database_path = PathBuf::from("database");
+        let dictionary_path = PathBuf::from(format!("/usr/local/share/vocabulist/{}", DICTIONARY));
+        let backend = String::from("mecab");
+
+        let anki: AnkiConnect = Default::default();
+
+        let config = Config::new(database_path, None, backend, anki);
+
+        assert_eq!(config.dictionary_path(), dictionary_path);
     }
 }

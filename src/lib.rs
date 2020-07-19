@@ -375,7 +375,7 @@ pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let mut conn = database::connect(database_path);
 
     let dictionary_path = p.dictionary_path();
-    let dict = dictionary::connect(dictionary_path)?;
+    let dict = dictionary::connect(&dictionary_path)?;
 
     if let Some(max) = m.value_of("number") {
         let max = max.parse::<i32>().unwrap();

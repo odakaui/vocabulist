@@ -1,7 +1,7 @@
 vocabulist
 ------------
 
-[![Build Status](https://travis-ci.org/odakaui/vocabulist.svg?branch=master)](https://travis-ci.org/github/odakaui/vocabulist)
+![Rust](https://github.com/odakaui/vocabulist/workflows/Rust/badge.svg)
 
 So, you're learning Japanese.
 

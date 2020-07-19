@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.8] - 2020-07-19
+
+### Added
+
+- Added build status to README
+
 ## [0.1.7] - 2020-07-19
 
 ### Fixed

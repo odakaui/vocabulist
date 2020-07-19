@@ -15,6 +15,7 @@ jobs:
     name: Deploy from ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      max-parallel: 1
       matrix:
         os: [ubuntu-latest, macOS-latest]
 
@@ -41,8 +42,8 @@ jobs:
     - name: Build Release
       run: cargo build --verbose --release --workspace --target $TARGET
       
-    - name: Set Tag
-      run: echo "::set-env name=TAG::${{ github.ref }}"
+    - name: Set TAG_PATH
+      run: echo "::set-env name=TAG_PATH::${{ github.ref }}"
       
     - name: Package Release Linux 
       id: package_archive
@@ -53,12 +54,14 @@ jobs:
         package_path="$stage_path/$NAME"
         package="$NAME"
 
-        tag="$(basename $TAG)"
+        tag="$(basename $TAG_PATH)"
 
         archive_name="$NAME-$tag-$TARGET.tar.gz"
 
         echo "::set-output name=tag::${tag}"
         echo "::set-output name=archive_name::${archive_name}"
+
+        echo "::set-env name=TAG::${tag}"
 
         mkdir -p $package_path
         
@@ -72,7 +75,7 @@ jobs:
         tar czf "${src_path}/${archive_name}" "${package}"
 
         cd $src_path
-    
+
     - name: Upload the Assets
       id: create_release
       uses: softprops/action-gh-release@v1
@@ -81,3 +84,28 @@ jobs:
         files: ${{ steps.package_archive.outputs.archive_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set HASH 
+      run: echo "::set-env name=HASH::${{ hashFiles( steps.package_archive.outputs.archive_name ) }}"
+        
+    - name: Set FORMULA_PATH
+      run: echo "::set-env name=FORMULA_PATH::homebrew-vocabulist/Formula/vocabulist.rb"
+
+    - name: Update Formula
+      run: |
+
+        repo="https://odakaui:${{ secrets.PAT }}@github.com/odakaui/homebrew-vocabulist.git"
+        git clone "${repo}" "homebrew-vocabulist"
+
+        python3 ci/update_homebrew_formula.py
+        
+        cd "homebrew-vocabulist/Formula"
+
+        tag="${{ steps.package_archive.outputs.tag }}"
+
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+
+        git add .
+        git commit -am "Version ${tag:1}"
+        git push "${repo}" master

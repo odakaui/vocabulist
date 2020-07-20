@@ -88,6 +88,8 @@ jobs:
     - name: Set HASH 
       run: |
         hash="$(shasum -a 256 ${{ steps.package_archive.outputs.archive_name }})"
+        hash="$(echo "$hash" | awk '{print $1}')"
+
         echo "::set-env name=HASH::${hash}"
         
     - name: Set FORMULA_PATH

@@ -86,14 +86,15 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set HASH 
-      run: echo "::set-env name=HASH::${{ hashFiles( steps.package_archive.outputs.archive_name ) }}"
+      run: |
+        hash="$(shasum -a 256 ${{ steps.package_archive.outputs.archive_name }})"
+        echo "::set-env name=HASH::${hash}"
         
     - name: Set FORMULA_PATH
       run: echo "::set-env name=FORMULA_PATH::homebrew-vocabulist/Formula/vocabulist.rb"
 
     - name: Update Formula
       run: |
-
         repo="https://odakaui:${{ secrets.PAT }}@github.com/odakaui/homebrew-vocabulist.git"
         git clone "${repo}" "homebrew-vocabulist"
 

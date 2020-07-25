@@ -1,5 +1,5 @@
 use crate::Expression;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -386,3 +386,132 @@ sql!(
     UPDATE_IS_EXCLUDED_FOR_EXPRESSION,
     params = [conn: &Connection, expression: &str, is_excluded: i32]
 );
+
+struct Database {
+    connection: Box<Connection>,
+}
+
+impl Database {
+    /// create a database struct
+    pub fn new(path: &PathBuf) -> Result<Self, Box<dyn Error>> {
+        let conn = Box::new(Connection::open(path)?);
+        let db = Database { connection: conn };
+
+        db.initialize()?;
+
+        Ok(db)
+    }
+
+    /// the Database connection
+    pub fn connection(&self) -> &Connection {
+        &self.connection
+    }
+
+    pub fn transaction(&mut self) -> Result<Transaction, Box<dyn Error>> {
+        let conn = &mut self.connection;
+
+        Ok(conn.transaction()?)
+    }
+
+    /// insert a list of Expression structs
+    pub fn insert_expression_list(
+        &mut self,
+        expression_list: Vec<Expression>,
+        callback: &dyn Fn(),
+    ) -> Result<(), Box<dyn Error>> {
+        let tx = self.transaction()?;
+
+        for expression in expression_list.iter() {
+            let expression_string = expression.get_expression();
+            let pos_string = &expression.get_pos()[0];
+            let sentence_string = &expression.get_sentence()[0];
+            let surface_string = &expression.get_surface_string()[0];
+
+            query::expression::insert(&tx, expression_string)?;
+            query::pos::insert(&tx, pos_string)?;
+            query::sentence::insert(&tx, sentence_string)?;
+            query::surface_string::insert(&tx, surface_string)?;
+
+            let expression_id = query::expression::select_id(&tx, expression_string)?;
+            let pos_id = query::pos::select_id(&tx, pos_string)?;
+            let sentence_id = query::sentence::select_id(&tx, sentence_string)?;
+            let surface_string_id = query::surface_string::select_id(&tx, surface_string)?;
+
+            query::insert_join(&tx, expression_id, pos_id, sentence_id, surface_string_id)?;
+
+            callback();
+        }
+
+        tx.commit()?;
+
+        Ok(())
+    }
+
+    /// initialize the database tables
+    fn initialize(&self) -> Result<(), Box<dyn Error>> {
+        let conn = &self.connection;
+
+        query::table::create_expressions(conn)?;
+        query::table::create_pos(conn)?;
+        query::table::create_sentences(conn)?;
+        query::table::create_surface_strings(conn)?;
+        query::table::create_expressions_pos_sentences_surface_strings(conn)?;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let test_dir = std::env::current_exe()
+            .expect("Failed to get executable path")
+            .parent()
+            .unwrap()
+            .join("test_database");
+
+        if !test_dir.is_dir() {
+            std::fs::create_dir(&test_dir).expect("Failed to create test directory");
+        }
+
+        let database_path = test_dir.join("test_new.db");
+
+        let db = Database::new(&database_path).expect("Failed to create database struct");
+        let conn = db.connection();
+
+        let expressions_exists = table_exists(conn, "expressions");
+        let pos_exists = table_exists(conn, "pos");
+        let sentences_exists = table_exists(conn, "sentences");
+        let surface_strings_exists = table_exists(conn, "surface_strings");
+        let join_exists = table_exists(conn, "expressions_pos_sentences_surface_strings");
+
+        std::fs::remove_file(database_path);
+
+        assert!(expressions_exists, "expression table doesn't exist");
+        assert!(pos_exists, "pos table doesn't exist");
+        assert!(sentences_exists, "sentence table doesn't exist");
+        assert!(surface_strings_exists, "surface string table doesn't exist");
+        assert!(join_exists, "join table doesn't exist");
+    }
+
+    fn table_exists(conn: &Connection, name: &str) -> bool {
+        let mut statement = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type=\"table\" AND name=?;")
+            .unwrap();
+
+        let table_list: Vec<String> = statement
+            .query_map(params![name], |row| Ok(row.get(0).unwrap()))
+            .unwrap()
+            .map(|row| row.unwrap())
+            .collect();
+
+        if table_list.len() > 0 {
+            true
+        } else {
+            false
+        }
+    }
+}

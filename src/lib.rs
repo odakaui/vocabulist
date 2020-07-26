@@ -62,7 +62,8 @@ fn token_list_to_expression_list(token_list: Vec<Token>) -> Vec<Expression> {
 }
 
 fn database_connection(database_path: &PathBuf) -> Connection {
-    database::connect(database_path)
+    // @TODO remove the unwrap
+    database::connect(database_path).unwrap()
 }
 
 fn format_anki_definition(
@@ -180,7 +181,8 @@ fn create_flashcards_from_expression_list(
 pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connect(database_path)?;
+    database::initialize(&conn)?;
 
     let backend_string = p.backend();
     let path = Path::new(m.value_of("path").unwrap());
@@ -207,7 +209,7 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
         let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
             .expect("Failed to retrieve sentences from the database");
         let expression_list =
-            database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);
+            filter_imported_expression_list(&duplicate_sentence_list, expression_list);
 
         let len = expression_list.len() as u64;
         let pb = progress_bar::new(len, "Importing");
@@ -242,7 +244,8 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let conn = database::connect(database_path);
+    let conn = database::connect(database_path)?;
+    database::initialize(&conn)?;
 
     match m.is_present("pos") {
         true => {
@@ -290,7 +293,8 @@ pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connect(database_path)?;
+    database::initialize(&conn)?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -331,7 +335,8 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connect(database_path)?;
+    database::initialize(&conn)?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -372,7 +377,8 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connect(database_path)?;
+    database::initialize(&conn)?;
 
     let dictionary_path = p.dictionary_path();
     let dict = dictionary::connect(&dictionary_path)?;
@@ -490,4 +496,28 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+
+fn filter_imported_expression_list(
+    sentence_list: &Vec<String>,
+    expression_list: Vec<Expression>,
+) -> Vec<Expression> {
+    let mut tmp_expression_list: Vec<Expression> = Vec::new();
+    for expression in expression_list.into_iter() {
+        let mut is_duplicate = false;
+        for sentence in sentence_list.iter() {
+            let sentence_string = &expression.get_sentence()[0];
+            if sentence_string == sentence {
+                is_duplicate = true;
+                break;
+            }
+        }
+
+        if !is_duplicate {
+            tmp_expression_list.push(expression);
+        }
+    }
+
+    tmp_expression_list
 }

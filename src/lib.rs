@@ -498,7 +498,6 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
 fn filter_imported_expression_list(
     sentence_list: &Vec<String>,
     expression_list: Vec<Expression>,

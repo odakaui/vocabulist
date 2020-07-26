@@ -47,6 +47,12 @@ pub fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub fn select_sentence_list(conn: &Connection) -> Result<Vec<String>, Box<dyn Error>> {
+    let sentence_list: Vec<String> = Vec::new();
+
+    Ok(sentence_list)
+}
+
 /// Create a list of sentences that have already been imported and that are in sentence_list.
 pub fn select_imported_sentence_list(
     conn: &Connection,
@@ -61,6 +67,7 @@ pub fn select_imported_sentence_list(
 
     Ok(duplicate_sentence_list)
 }
+
 /// Insert a vector of Expression objects into the database.
 ///
 /// # Arguments
@@ -349,19 +356,32 @@ sql!(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_initialize() {
-        let test_dir = std::env::current_exe()
-            .expect("Failed to get executable path")
+    fn setup(db_name: &str) -> Result<PathBuf, Box<dyn Error>> {
+        // get path to executable
+        let test_dir = std::env::current_exe()?
             .parent()
             .unwrap()
             .join("test_database");
 
+        // create tmp directory
         if !test_dir.is_dir() {
-            std::fs::create_dir(&test_dir).expect("Failed to create test directory");
+            std::fs::create_dir(&test_dir)?;
         }
 
-        let db_path = test_dir.join("test_new.db");
+        let db_path = test_dir.join(db_name);
+
+        Ok(db_path)
+    }
+
+    fn tear_down(db_path: PathBuf) -> Result<(), Box<dyn Error>> {
+        std::fs::remove_file(db_path)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_initialize() {
+        let db_path = setup("test_initialize.db").expect("Failed to setup `initialize test`");
 
         let conn = connect(&db_path).expect("Failed to connect to database");
 
@@ -373,7 +393,7 @@ mod tests {
         let surface_strings_exists = table_exists(&conn, "surface_strings");
         let join_exists = table_exists(&conn, "expressions_pos_sentences_surface_strings");
 
-        std::fs::remove_file(db_path);
+        tear_down(db_path).expect("Failed to tear down `initialize test`");
 
         assert!(expressions_exists, "expression table doesn't exist");
         assert!(pos_exists, "pos table doesn't exist");
@@ -381,6 +401,9 @@ mod tests {
         assert!(surface_strings_exists, "surface string table doesn't exist");
         assert!(join_exists, "join table doesn't exist");
     }
+
+    #[test]
+    fn test_select_sentence_list() {}
 
     fn table_exists(conn: &Connection, name: &str) -> bool {
         let mut statement = conn

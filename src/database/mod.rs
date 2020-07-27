@@ -69,8 +69,13 @@ pub fn insert_expression(tx: &Transaction, expression: &str) -> Result<(), Box<d
     Ok(())
 }
 
-fn insert_sentence(conn: &Connection) -> Result<(), Box<dyn Error>> {
-    todo!()
+/// insert sentence into database
+fn insert_sentence(tx: &Transaction, sentence: &str) -> Result<(), Box<dyn Error>> {
+    let query = "INSERT OR IGNORE INTO sentences (sentence) VALUES (?);";
+
+    tx.execute(query, params![sentence])?;
+
+    Ok(())
 }
 
 /// Insert a vector of Expression objects into the database.
@@ -486,6 +491,50 @@ mod tests {
         for result in frequency_result_list.iter() {
             assert!(frequency_list.contains(result));
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_insert_sentence() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_insert_sentence.db")?;
+        let mut conn = connect(&db_path)?;
+
+        initialize(&conn)?;
+
+        let sentence_list: Vec<String> = vec![
+            "プロ野球は今、客を５０００人まで入れて試合をしています。", 
+            "８月からはイベントの客の数を増やしてもいいと国が言っていたため、会場の半分まで客を増やす予定でした。"
+        ]
+        .iter()
+        .map(|sentence| sentence.to_string())
+        .collect();
+
+        // test
+        let mut tx = conn.transaction()?;
+
+        for sentence in sentence_list.iter() {
+            insert_sentence(&tx, sentence)?;
+        }
+
+        tx.set_drop_behavior(DropBehavior::Commit);
+        tx.finish()?;
+
+        // results
+        let mut statement = conn.prepare("SELECT sentence FROM sentences;")?;
+        let result_list: Vec<String> = statement.query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap_or_default())
+            .collect();
+
+        statement.finalize()?;
+
+        // cleanup
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(sentence_list, result_list);
 
         Ok(())
     }

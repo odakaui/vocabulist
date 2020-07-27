@@ -47,6 +47,7 @@ pub fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// check sentence exists in database
 pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool, Box<dyn Error>> {
     let mut statement = conn.prepare("SELECT sentence FROM sentences WHERE sentence = ?;")?;
 

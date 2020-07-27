@@ -518,11 +518,17 @@ mod tests {
 
         let sentence_list: Vec<String> = vec![
             "プロ野球は今、客を５０００人まで入れて試合をしています。", 
+            "プロ野球は今、客を５０００人まで入れて試合をしています。", 
             "８月からはイベントの客の数を増やしてもいいと国が言っていたため、会場の半分まで客を増やす予定でした。"
         ]
         .iter()
         .map(|sentence| sentence.to_string())
         .collect();
+
+        let mut sorted_list: Vec<String> = sentence_list.clone();
+
+        sorted_list.sort();
+        sorted_list.dedup();
 
         // test
         let mut tx = conn.transaction()?;
@@ -536,10 +542,12 @@ mod tests {
 
         // results
         let mut statement = conn.prepare("SELECT sentence FROM sentences;")?;
-        let result_list: Vec<String> = statement
+        let mut result_list: Vec<String> = statement
             .query_map(params![], |row| Ok(row.get(0)?))?
             .map(|row| row.unwrap_or_default())
             .collect();
+
+        result_list.sort();
 
         statement.finalize()?;
 
@@ -548,7 +556,8 @@ mod tests {
         tear_down(db_path)?;
 
         // assert
-        assert_eq!(sentence_list, result_list);
+        assert_eq!(result_list, sorted_list);
+        assert_ne!(result_list, sentence_list);
 
         Ok(())
     }

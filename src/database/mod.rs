@@ -1,5 +1,5 @@
 use crate::Expression;
-use rusqlite::{params, Connection, Transaction};
+use rusqlite::{params, Connection, DropBehavior, Transaction};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -48,28 +48,27 @@ pub fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool, Box<dyn Error>> {
-        let mut statement = conn.prepare("SELECT sentence FROM sentences WHERE sentence = ?;")?;
+    let mut statement = conn.prepare("SELECT sentence FROM sentences WHERE sentence = ?;")?;
 
-        Ok(statement.exists(params![sentence])?)
+    Ok(statement.exists(params![sentence])?)
+}
+
+pub fn insert_expression(tx: &Transaction, expression: &str) -> Result<(), Box<dyn Error>> {
+    let query = "
+        INSERT OR IGNORE INTO 
+            expressions (expression) 
+        VALUES (?) 
+        ON CONFLICT (expression) 
+            DO UPDATE SET frequency = frequency + 1;
+    ";
+
+    tx.execute(query, params![expression])?;
+
+    Ok(())
 }
 
 fn insert_sentence(conn: &Connection) -> Result<(), Box<dyn Error>> {
     todo!()
-}
-
-/// Create a list of sentences that have already been imported and that are in sentence_list.
-pub fn select_imported_sentence_list(
-    conn: &Connection,
-    sentence_list: &Vec<String>,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut duplicate_sentence_list: Vec<String> = Vec::new();
-    for sentence in sentence_list.iter() {
-        if query::sentence::exists(conn, sentence)? {
-            duplicate_sentence_list.push(sentence.to_string());
-        }
-    }
-
-    Ok(duplicate_sentence_list)
 }
 
 /// Insert a vector of Expression objects into the database.
@@ -408,7 +407,83 @@ mod tests {
         tear_down(db_path)?;
 
         assert!(does_exist == true, "sentence does not exist when it should");
-        assert!(does_not_exist == false, "sentence exists when it should not");
+        assert!(
+            does_not_exist == false,
+            "sentence exists when it should not"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_insert_expression() -> Result<(), Box<dyn Error>> {
+        let db_path = setup("test_insert_expression.db")?;
+        let mut conn = connect(&db_path)?;
+
+        initialize(&conn)?;
+
+        let mut tx = conn.transaction()?;
+
+        let expression_list: Vec<String> = vec![
+            "プロ", "プロ", "野球", "は", "今", "客", "を", "人", "まで", "入れ", "て", "試合",
+            "を", "し", "て", "い", "ます",
+        ]
+        .iter()
+        .map(|expression| expression.to_string())
+        .collect();
+
+        // terms with frequency 2
+        let frequency_list: Vec<String> = ["プロ", "て", "を"]
+            .iter()
+            .map(|expression| expression.to_string())
+            .collect();
+
+        // get number of non duplicate expressions
+        let mut tmp_list = expression_list.clone();
+        tmp_list.sort();
+        println!("{:?}", tmp_list);
+        tmp_list.dedup();
+
+        let num_rows = tmp_list.len();
+
+        // insert expressions into database
+        for expression in expression_list.iter() {
+            insert_expression(&tx, &expression)?;
+        }
+
+        // close transaction
+        tx.set_drop_behavior(DropBehavior::Commit);
+        tx.finish()?;
+
+        // get all expressions from database
+        let mut statement = conn.prepare("SELECT expression FROM expressions;")?;
+        let result_list: Vec<String> = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap_or_default())
+            .collect();
+
+        // get expressoins with frequency > 1 from database
+        let mut statement =
+            conn.prepare("SELECT expression FROM expressions WHERE frequency > 1;")?;
+        let frequency_result_list: Vec<String> = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap_or_default())
+            .collect();
+
+        tear_down(db_path)?;
+
+        // check number of rows equals length of expression list - 1
+        assert_eq!(result_list.len(), num_rows);
+
+        // check each expression is in database
+        for result in result_list.iter() {
+            assert!(expression_list.contains(result));
+        }
+
+        // check each expression with frequency > 1 in database
+        for result in frequency_result_list.iter() {
+            assert!(frequency_list.contains(result));
+        }
 
         Ok(())
     }

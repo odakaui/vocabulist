@@ -47,10 +47,14 @@ pub fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn select_sentence_list(conn: &Connection) -> Result<Vec<String>, Box<dyn Error>> {
-    let sentence_list: Vec<String> = Vec::new();
+pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool, Box<dyn Error>> {
+        let mut statement = conn.prepare("SELECT sentence FROM sentences WHERE sentence = ?;")?;
 
-    Ok(sentence_list)
+        Ok(statement.exists(params![sentence])?)
+}
+
+fn insert_sentence(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    todo!()
 }
 
 /// Create a list of sentences that have already been imported and that are in sentence_list.
@@ -356,6 +360,59 @@ sql!(
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_initialize() {
+        let db_path = setup("test_initialize.db").expect("Failed to setup `initialize test`");
+
+        let conn = connect(&db_path).expect("Failed to connect to database");
+        initialize(&conn).expect("Failed to initialize dabatabase tables");
+
+        let expressions_exists = table_exists(&conn, "expressions");
+        let pos_exists = table_exists(&conn, "pos");
+        let sentences_exists = table_exists(&conn, "sentences");
+        let surface_strings_exists = table_exists(&conn, "surface_strings");
+        let join_exists = table_exists(&conn, "expressions_pos_sentences_surface_strings");
+
+        tear_down(db_path).expect("Failed to tear down `initialize test`");
+
+        assert!(expressions_exists, "expression table doesn't exist");
+        assert!(pos_exists, "pos table doesn't exist");
+        assert!(sentences_exists, "sentence table doesn't exist");
+        assert!(surface_strings_exists, "surface string table doesn't exist");
+        assert!(join_exists, "join table doesn't exist");
+    }
+
+    #[test]
+    fn test_select_sentence_list() -> Result<(), Box<dyn Error>> {
+        let db_path = setup("test_select_sentence_list.db")?;
+
+        let mut conn = connect(&db_path)?;
+        initialize(&conn)?;
+
+        let sentence_list: Vec<String> = vec![
+            "プロ野球は今、客を５０００人まで入れて試合をしています。", 
+            "８月からはイベントの客の数を増やしてもいいと国が言っていたため、会場の半分まで客を増やす予定でした。"
+        ]
+        .iter()
+        .map(|sentence| sentence.to_string())
+        .collect();
+
+        let query = "INSERT INTO sentences (sentence) VALUES (?);";
+        for sentence in sentence_list.iter() {
+            conn.execute(query, params![sentence])?;
+        }
+
+        let does_exist = select_sentence_exists(&conn, &sentence_list[0])?;
+        let does_not_exist = select_sentence_exists(&conn, "Hello World")?;
+
+        tear_down(db_path)?;
+
+        assert!(does_exist == true, "sentence does not exist when it should");
+        assert!(does_not_exist == false, "sentence exists when it should not");
+
+        Ok(())
+    }
+
     fn setup(db_name: &str) -> Result<PathBuf, Box<dyn Error>> {
         // get path to executable
         let test_dir = std::env::current_exe()?
@@ -378,32 +435,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn test_initialize() {
-        let db_path = setup("test_initialize.db").expect("Failed to setup `initialize test`");
-
-        let conn = connect(&db_path).expect("Failed to connect to database");
-
-        initialize(&conn).expect("Failed to initialize dabatabase tables");
-
-        let expressions_exists = table_exists(&conn, "expressions");
-        let pos_exists = table_exists(&conn, "pos");
-        let sentences_exists = table_exists(&conn, "sentences");
-        let surface_strings_exists = table_exists(&conn, "surface_strings");
-        let join_exists = table_exists(&conn, "expressions_pos_sentences_surface_strings");
-
-        tear_down(db_path).expect("Failed to tear down `initialize test`");
-
-        assert!(expressions_exists, "expression table doesn't exist");
-        assert!(pos_exists, "pos table doesn't exist");
-        assert!(sentences_exists, "sentence table doesn't exist");
-        assert!(surface_strings_exists, "surface string table doesn't exist");
-        assert!(join_exists, "join table doesn't exist");
-    }
-
-    #[test]
-    fn test_select_sentence_list() {}
 
     fn table_exists(conn: &Connection, name: &str) -> bool {
         let mut statement = conn

@@ -206,7 +206,7 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             token_list_to_expression_list(tokenizer.tokenize(&sentence_list, &mut callback)?);
         pb.finish_with_message("Tokenized");
 
-        let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
+        let duplicate_sentence_list = select_imported_sentence_list(conn, &sentence_list)
             .expect("Failed to retrieve sentences from the database");
         let expression_list =
             filter_imported_expression_list(&duplicate_sentence_list, expression_list);
@@ -519,4 +519,19 @@ fn filter_imported_expression_list(
     }
 
     tmp_expression_list
+}
+
+/// Create a list of sentences that have already been imported and that are in sentence_list.
+fn select_imported_sentence_list(
+    conn: &Connection,
+    sentence_list: &Vec<String>,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut duplicate_sentence_list: Vec<String> = Vec::new();
+    for sentence in sentence_list.iter() {
+        if database::select_sentence_exists(conn, sentence)? {
+            duplicate_sentence_list.push(sentence.to_string());
+        }
+    }
+
+    Ok(duplicate_sentence_list)
 }

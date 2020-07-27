@@ -54,6 +54,7 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
     Ok(statement.exists(params![sentence])?)
 }
 
+/// insert expression into database
 pub fn insert_expression(tx: &Transaction, expression: &str) -> Result<(), Box<dyn Error>> {
     let query = "
         INSERT OR IGNORE INTO 

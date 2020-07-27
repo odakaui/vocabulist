@@ -82,6 +82,15 @@ pub fn insert_sentence(tx: &Transaction, sentence: &str) -> Result<(), Box<dyn E
     Ok(())
 }
 
+/// insert surface string into database
+pub fn insert_surface_string(tx: &Transaction, surface_string: &str) -> Result<(), Box<dyn Error>> {
+    let query = "INSERT OR IGNORE INTO surface_strings (surface_string) VALUES (?);";
+
+    tx.execute(query, params![surface_string])?;
+
+    Ok(())
+}
+
 /// Insert a vector of Expression objects into the database.
 ///
 /// # Arguments
@@ -591,6 +600,58 @@ mod tests {
 
         // assert
         assert_eq!(sorted_list, sorted_list);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_insert_surface_string() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_insert_surface_string.db")?;
+        let mut conn = connect(&db_path)?;
+
+        initialize(&conn)?;
+
+        let surface_string_list: Vec<String> = vec![
+            "プロ", "プロ", "野球", "は", "今", "客", "を", "人", "まで", "入れ", "て", "試合",
+            "を", "し", "て", "い", "ます",
+        ]
+        .iter()
+        .map(|surface_string| surface_string.to_string())
+        .collect();
+
+        let mut sorted_list: Vec<String> = surface_string_list.clone();
+
+        sorted_list.sort();
+        sorted_list.dedup();
+
+        // test
+        let mut tx = conn.transaction()?;
+
+        for surface_string in surface_string_list.iter() {
+            insert_surface_string(&tx, surface_string)?;
+        }
+
+        tx.set_drop_behavior(DropBehavior::Commit);
+        tx.finish()?;
+
+        // results
+        let mut statement = conn.prepare("SELECT surface_string FROM surface_strings;")?;
+        let mut result_list: Vec<String> = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap_or_default())
+            .collect();
+        result_list.sort();
+
+        statement.finalize()?;
+
+        // cleanup
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(result_list, sorted_list);
+        assert_ne!(result_list, surface_string_list);
 
         Ok(())
     }

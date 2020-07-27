@@ -56,21 +56,25 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
 
 /// insert expression into database
 pub fn insert_expression(tx: &Transaction, expression: &str) -> Result<(), Box<dyn Error>> {
-    let query = "
-        INSERT OR IGNORE INTO 
-            expressions (expression) 
-        VALUES (?) 
-        ON CONFLICT (expression) 
-            DO UPDATE SET frequency = frequency + 1;
-    ";
+    let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) 
+        ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
 
     tx.execute(query, params![expression])?;
 
     Ok(())
 }
 
+/// insert pos into database
+pub fn insert_pos(tx: &Transaction, pos: &str) -> Result<(), Box<dyn Error>> {
+    let query = "INSERT OR IGNORE INTO pos (pos) VALUES (?);";
+
+    tx.execute(query, params![pos])?;
+
+    Ok(())
+}
+
 /// insert sentence into database
-fn insert_sentence(tx: &Transaction, sentence: &str) -> Result<(), Box<dyn Error>> {
+pub fn insert_sentence(tx: &Transaction, sentence: &str) -> Result<(), Box<dyn Error>> {
     let query = "INSERT OR IGNORE INTO sentences (sentence) VALUES (?);";
 
     tx.execute(query, params![sentence])?;
@@ -523,7 +527,8 @@ mod tests {
 
         // results
         let mut statement = conn.prepare("SELECT sentence FROM sentences;")?;
-        let result_list: Vec<String> = statement.query_map(params![], |row| Ok(row.get(0)?))?
+        let result_list: Vec<String> = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
             .map(|row| row.unwrap_or_default())
             .collect();
 
@@ -535,6 +540,57 @@ mod tests {
 
         // assert
         assert_eq!(sentence_list, result_list);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_insert_pos() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_insert_pos.db")?;
+        let mut conn = connect(&db_path)?;
+
+        initialize(&conn)?;
+
+        let pos_list: Vec<String> = vec![
+            "名詞", "名詞", "助詞", "名詞", "記号", "名詞", "助詞", "名詞", "名詞", "名詞", "名詞",
+            "名詞",
+        ]
+        .iter()
+        .map(|sentence| sentence.to_string())
+        .collect();
+
+        let mut sorted_list: Vec<String> = pos_list.clone();
+        sorted_list.sort();
+        sorted_list.dedup();
+
+        // test
+        let mut tx = conn.transaction()?;
+
+        for pos in pos_list.iter() {
+            insert_pos(&tx, pos)?;
+        }
+
+        tx.set_drop_behavior(DropBehavior::Commit);
+        tx.finish()?;
+
+        // results
+        let mut statement = conn.prepare("SELECT pos FROM pos;")?;
+        let mut result_list: Vec<String> = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap_or_default())
+            .collect();
+
+        result_list.sort();
+
+        statement.finalize()?;
+
+        // cleanup
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(sorted_list, sorted_list);
 
         Ok(())
     }

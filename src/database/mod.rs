@@ -28,40 +28,11 @@ macro_rules! sql {
 }
 
 mod query;
+mod table;
+mod term;
 
-pub struct Term {
-    expression: String,
-    pos: String,
-    sentence: String,
-    surface_string: String,
-}
-
-impl Term {
-    pub fn new(expression: String, pos: String, sentence: String, surface_string: String) -> Self {
-        Term {
-            expression,
-            pos,
-            sentence,
-            surface_string,
-        }
-    }
-
-    pub fn expression(&self) -> &str {
-        &self.expression
-    }
-
-    pub fn pos(&self) -> &str {
-        &self.pos
-    }
-
-    pub fn sentence(&self) -> &str {
-        &self.sentence
-    }
-
-    pub fn surface_string(&self) -> &str {
-        &self.surface_string
-    }
-}
+pub use table::initialize;
+pub use term::Term;
 
 /// DEPRACATED: get Connection object for database
 pub fn connect(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
@@ -81,17 +52,6 @@ pub fn transaction(conn: &mut Connection) -> Result<Transaction, Box<dyn Error>>
     let tx = conn.transaction()?;
 
     Ok(tx)
-}
-
-/// initialize database tables
-pub fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
-    query::table::create_expressions(conn)?;
-    query::table::create_pos(conn)?;
-    query::table::create_sentences(conn)?;
-    query::table::create_surface_strings(conn)?;
-    query::table::create_expressions_pos_sentences_surface_strings(conn)?;
-
-    Ok(())
 }
 
 /// check sentence exists in database
@@ -466,6 +426,22 @@ fn insert_join(
     Ok(())
 }
 
+fn create_expressions(tx: &Transaction) -> Result<(), Box<dyn Error>> {
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS expressions (
+                id INTEGER PRIMARY KEY,
+                expression TEXT NOT NULL UNIQUE,
+                frequency DEFAULT 1,
+                is_excluded INTEGER DEFAULT 0,
+                in_anki INTEGER NOT NULL DEFAULT 0,
+                is_learned INTEGER NOT NULL DEFAULT 0
+                );",
+        params![],
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,34 +449,14 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_initialize() {
-        let db_path = setup("test_initialize.db").expect("Failed to setup `initialize test`");
-
-        let conn = connect(&db_path).expect("Failed to connect to database");
-        initialize(&conn).expect("Failed to initialize dabatabase tables");
-
-        let expressions_exists = table_exists(&conn, "expressions");
-        let pos_exists = table_exists(&conn, "pos");
-        let sentences_exists = table_exists(&conn, "sentences");
-        let surface_strings_exists = table_exists(&conn, "surface_strings");
-        let join_exists = table_exists(&conn, "expressions_pos_sentences_surface_strings");
-
-        tear_down(db_path).expect("Failed to tear down `initialize test`");
-
-        assert!(expressions_exists, "expression table doesn't exist");
-        assert!(pos_exists, "pos table doesn't exist");
-        assert!(sentences_exists, "sentence table doesn't exist");
-        assert!(surface_strings_exists, "surface string table doesn't exist");
-        assert!(join_exists, "join table doesn't exist");
-    }
-
-    #[test]
-    #[ignore]
     fn test_select_sentence_list() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_select_sentence_list.db")?;
 
-        let mut conn = connect(&db_path)?;
-        initialize(&conn)?;
+        let mut conn = connection(&db_path)?;
+
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let sentence_list: Vec<String> = vec![
             "プロ野球は今、客を５０００人まで入れて試合をしています。", 
@@ -533,9 +489,11 @@ mod tests {
     #[ignore]
     fn test_insert_expression() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_insert_expression.db")?;
-        let mut conn = connect(&db_path)?;
+        let mut conn = connection(&db_path)?;
 
-        initialize(&conn)?;
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let mut tx = conn.transaction()?;
 
@@ -607,9 +565,11 @@ mod tests {
     fn test_insert_sentence() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_sentence.db")?;
-        let mut conn = connect(&db_path)?;
+        let mut conn = connection(&db_path)?;
 
-        initialize(&conn)?;
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let sentence_list: Vec<String> = vec![
             "プロ野球は今、客を５０００人まで入れて試合をしています。", 
@@ -662,9 +622,11 @@ mod tests {
     fn test_insert_pos() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_pos.db")?;
-        let mut conn = connect(&db_path)?;
+        let mut conn = connection(&db_path)?;
 
-        initialize(&conn)?;
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let pos_list: Vec<String> = vec![
             "名詞", "名詞", "助詞", "名詞", "記号", "名詞", "助詞", "名詞", "名詞", "名詞", "名詞",
@@ -714,9 +676,11 @@ mod tests {
     fn test_insert_surface_string() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_surface_string.db")?;
-        let mut conn = connect(&db_path)?;
+        let mut conn = connection(&db_path)?;
 
-        initialize(&conn)?;
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let surface_string_list: Vec<String> = vec![
             "プロ", "プロ", "野球", "は", "今", "客", "を", "人", "まで", "入れ", "て", "試合",
@@ -766,10 +730,12 @@ mod tests {
     #[ignore]
     fn test_insert_term() -> Result<(), Box<dyn Error>> {
         // setup
-        let db_path = setup("test_insert_surface_string.db")?;
-        let mut conn = connect(&db_path)?;
+        let db_path = setup("test_insert_term.db")?;
+        let mut conn = connection(&db_path)?;
 
-        initialize(&conn)?;
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+        tx.commit()?;
 
         let expected_num_expressions = 3;
         let expected_num_pos = 2;
@@ -954,23 +920,5 @@ mod tests {
         std::fs::remove_file(db_path)?;
 
         Ok(())
-    }
-
-    fn table_exists(conn: &Connection, name: &str) -> bool {
-        let mut statement = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type=\"table\" AND name=?;")
-            .unwrap();
-
-        let table_list: Vec<String> = statement
-            .query_map(params![name], |row| Ok(row.get(0).unwrap()))
-            .unwrap()
-            .map(|row| row.unwrap())
-            .collect();
-
-        if table_list.len() > 0 {
-            true
-        } else {
-            false
-        }
     }
 }

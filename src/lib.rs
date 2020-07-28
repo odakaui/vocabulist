@@ -181,8 +181,10 @@ fn create_flashcards_from_expression_list(
 pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path)?;
-    database::initialize(&conn)?;
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     let backend_string = p.backend();
     let path = Path::new(m.value_of("path").unwrap());
@@ -243,8 +245,10 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let conn = database::connect(database_path)?;
-    database::initialize(&conn)?;
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     match m.is_present("pos") {
         true => {
@@ -292,8 +296,10 @@ pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path)?;
-    database::initialize(&conn)?;
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -334,8 +340,10 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path)?;
-    database::initialize(&conn)?;
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -376,8 +384,10 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path)?;
-    database::initialize(&conn)?;
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     let dictionary_path = p.dictionary_path();
     let dict = dictionary::connect(&dictionary_path)?;

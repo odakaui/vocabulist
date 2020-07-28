@@ -29,11 +29,51 @@ macro_rules! sql {
 
 mod query;
 
+pub struct Term {
+    expression: String,
+    pos: String,
+    sentence: String,
+    surface_string: String,
+}
+
+impl Term {
+    pub fn new(expression: String, pos: String, sentence: String, surface_string: String) -> Self {
+        Term {
+            expression,
+            pos,
+            sentence,
+            surface_string,
+        }
+    }
+
+    pub fn expression(&self) -> &str {
+        &self.expression
+    }
+
+    pub fn pos(&self) -> &str {
+        &self.pos
+    }
+
+    pub fn sentence(&self) -> &str {
+        &self.sentence
+    }
+
+    pub fn surface_string(&self) -> &str {
+        &self.surface_string
+    }
+}
+
 /// get Connection object for database
 pub fn connect(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
     let conn = Connection::open(path)?;
 
     Ok(conn)
+}
+
+pub fn transaction(conn: &mut Connection) -> Result<Transaction, Box<dyn Error>> {
+    let tx = conn.transaction()?;
+
+    Ok(tx)
 }
 
 /// initialize database tables
@@ -87,6 +127,82 @@ pub fn insert_surface_string(tx: &Transaction, surface_string: &str) -> Result<(
     let query = "INSERT OR IGNORE INTO surface_strings (surface_string) VALUES (?);";
 
     tx.execute(query, params![surface_string])?;
+
+    Ok(())
+}
+
+/// select id for a given expression
+fn select_id_for_expression(tx: &Transaction, expression: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM expressions WHERE expression=?;";
+
+    let id: i32 = tx.query_row(query, params![expression], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given pos
+fn select_id_for_pos(tx: &Transaction, pos: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM pos WHERE pos=?;";
+
+    let id: i32 = tx.query_row(query, params![pos], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given sentence
+fn select_id_for_sentence(tx: &Transaction, sentence: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM sentences WHERE sentence=?;";
+
+    let id: i32 = tx.query_row(query, params![sentence], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given surface string
+fn select_id_for_surface_string(
+    tx: &Transaction,
+    surface_string: &str,
+) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM surface_strings WHERE surface_string=?;";
+
+    let id: i32 = tx.query_row(query, params![surface_string], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+fn insert_join(
+    tx: &Transaction,
+    exp_id: i32,
+    pos_id: i32,
+    sen_id: i32,
+    sur_id: i32,
+) -> Result<(), Box<dyn Error>> {
+    let query = "INSERT OR IGNORE INTO expressions_pos_sentences_surface_strings 
+        (expression_id, pos_id, sentence_id, surface_string_id) VALUES (?,?,?,?);";
+
+    tx.execute(query, params![exp_id, pos_id, sen_id, sur_id])?;
+
+    Ok(())
+}
+
+/// insert Expression struct into database
+pub fn insert_term(tx: &Transaction, term: &Term) -> Result<(), Box<dyn Error>> {
+    let expression = term.expression();
+    let pos = term.pos();
+    let sentence = term.sentence();
+    let surface_string = term.surface_string();
+
+    insert_expression(tx, expression)?;
+    insert_pos(tx, pos)?;
+    insert_sentence(tx, sentence)?;
+    insert_surface_string(tx, surface_string)?;
+
+    let exp_id = select_id_for_expression(tx, expression)?;
+    let pos_id = select_id_for_pos(tx, pos)?;
+    let sen_id = select_id_for_sentence(tx, sentence)?;
+    let sur_id = select_id_for_surface_string(tx, surface_string)?;
+
+    insert_join(tx, exp_id, pos_id, sen_id, sur_id)?;
 
     Ok(())
 }
@@ -380,6 +496,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn test_initialize() {
         let db_path = setup("test_initialize.db").expect("Failed to setup `initialize test`");
 
@@ -402,6 +519,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_select_sentence_list() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_select_sentence_list.db")?;
 
@@ -436,6 +554,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_insert_expression() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_insert_expression.db")?;
         let mut conn = connect(&db_path)?;
@@ -461,7 +580,6 @@ mod tests {
         // get number of non duplicate expressions
         let mut tmp_list = expression_list.clone();
         tmp_list.sort();
-        println!("{:?}", tmp_list);
         tmp_list.dedup();
 
         let num_rows = tmp_list.len();
@@ -509,6 +627,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_insert_sentence() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_sentence.db")?;
@@ -563,6 +682,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_insert_pos() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_pos.db")?;
@@ -614,6 +734,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_insert_surface_string() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_surface_string.db")?;
@@ -661,6 +782,177 @@ mod tests {
         // assert
         assert_eq!(result_list, sorted_list);
         assert_ne!(result_list, surface_string_list);
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn test_insert_term() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_insert_surface_string.db")?;
+        let mut conn = connect(&db_path)?;
+
+        initialize(&conn)?;
+
+        let expected_num_expressions = 3;
+        let expected_num_pos = 2;
+        let expected_num_sentences = 1;
+        let expected_num_surface_strings = 3;
+
+        let mut term_list: Vec<Term> = Vec::new();
+        term_list.push(Term::new(
+            "名前".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "名前".to_string(),
+        ));
+        term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "名前は何ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "何".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "何".to_string(),
+        ));
+
+        // test
+        let mut tx = conn.transaction()?;
+
+        for term in term_list.iter() {
+            insert_term(&tx, term)?;
+        }
+
+        tx.set_drop_behavior(DropBehavior::Commit);
+        tx.finish()?;
+
+        // results
+        let mut statement = conn.prepare("SELECT count(*) FROM expressions;")?;
+        let num_expressions: i32 = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap())
+            .collect::<Vec<i32>>()[0];
+
+        statement.finalize()?;
+
+        let mut statement = conn.prepare("SELECT count(*) FROM pos;")?;
+        let num_pos: i32 = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap())
+            .collect::<Vec<i32>>()[0];
+
+        statement.finalize()?;
+
+        let mut statement = conn.prepare("SELECT count(*) FROM sentences;")?;
+        let num_sentences: i32 = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap())
+            .collect::<Vec<i32>>()[0];
+
+        statement.finalize()?;
+
+        let mut statement = conn.prepare("SELECT count(*) FROM surface_strings;")?;
+        let num_surface_strings: i32 = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
+            .map(|row| row.unwrap())
+            .collect::<Vec<i32>>()[0];
+
+        statement.finalize()?;
+
+        let mut expression_statement =
+            conn.prepare("SELECT expression FROM expressions WHERE expression=?;")?;
+
+        let mut pos_statement = conn.prepare(
+            "SELECT pos FROM pos 
+                JOIN expressions_pos_sentences_surface_strings ON pos_id = pos.id
+                JOIN expressions ON expressions.id = expression_id
+                WHERE expression=?;",
+        )?;
+
+        let mut sentence_statement = conn.prepare(
+            "SELECT sentence FROM sentences 
+                JOIN expressions_pos_sentences_surface_strings ON sentence_id = sentences.id
+                JOIN expressions ON expressions.id = expression_id
+                WHERE expression=?;",
+        )?;
+
+        let mut surface_string_statement = conn.prepare("SELECT surface_string FROM surface_strings 
+                JOIN expressions_pos_sentences_surface_strings ON surface_string_id = surface_strings.id
+                JOIN expressions ON expressions.id = expression_id
+                WHERE expression=?;",
+        )?;
+
+        let mut result_list: Vec<(String, Vec<String>)> = Vec::new();
+        for term in term_list.iter() {
+            let expression_list = expression_statement
+                .query_map(params![term.expression()], |row| Ok(row.get(0)?))?
+                .map(|row| row.unwrap_or_default())
+                .collect();
+
+            result_list.push((term.expression().to_string(), expression_list));
+
+            let pos_list = pos_statement
+                .query_map(params![term.expression()], |row| Ok(row.get(0)?))?
+                .map(|row| row.unwrap_or_default())
+                .collect();
+
+            result_list.push((term.pos().to_string(), pos_list));
+
+            let sentence_list = sentence_statement
+                .query_map(params![term.expression()], |row| Ok(row.get(0)?))?
+                .map(|row| row.unwrap_or_default())
+                .collect();
+
+            result_list.push((term.sentence().to_string(), sentence_list));
+
+            let surface_string_list = surface_string_statement
+                .query_map(params![term.expression()], |row| Ok(row.get(0)?))?
+                .map(|row| row.unwrap_or_default())
+                .collect();
+
+            result_list.push((term.surface_string().to_string(), surface_string_list));
+        }
+
+        // cleanup
+        expression_statement.finalize()?;
+        pos_statement.finalize()?;
+        sentence_statement.finalize()?;
+        surface_string_statement.finalize()?;
+
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(
+            num_expressions, expected_num_expressions,
+            "unexpected number of expressions in database"
+        );
+        assert_eq!(
+            num_pos, expected_num_pos,
+            "unexpected number of pos in database"
+        );
+        assert_eq!(
+            num_sentences, expected_num_sentences,
+            "unexpected number of sentences in database"
+        );
+        assert_eq!(
+            num_surface_strings, expected_num_surface_strings,
+            "unexpected nuber of surface strings in database"
+        );
+
+        for result in result_list.iter() {
+            assert!(result.1.contains(&result.0), "join table is broken");
+        }
 
         Ok(())
     }

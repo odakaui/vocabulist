@@ -1,5 +1,5 @@
 use crate::Expression;
-use rusqlite::{params, Connection, DropBehavior, Transaction};
+use rusqlite::{params, Connection, Transaction};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -63,8 +63,15 @@ impl Term {
     }
 }
 
-/// get Connection object for database
+/// DEPRACATED: get Connection object for database
 pub fn connect(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
+    let conn = Connection::open(path)?;
+
+    Ok(conn)
+}
+
+/// get Connection object for database
+pub fn connection(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
     let conn = Connection::open(path)?;
 
     Ok(conn)
@@ -131,61 +138,7 @@ pub fn insert_surface_string(tx: &Transaction, surface_string: &str) -> Result<(
     Ok(())
 }
 
-/// select id for a given expression
-fn select_id_for_expression(tx: &Transaction, expression: &str) -> Result<i32, Box<dyn Error>> {
-    let query = "SELECT id FROM expressions WHERE expression=?;";
-
-    let id: i32 = tx.query_row(query, params![expression], |row| row.get(0))?;
-
-    Ok(id)
-}
-
-/// select id for a given pos
-fn select_id_for_pos(tx: &Transaction, pos: &str) -> Result<i32, Box<dyn Error>> {
-    let query = "SELECT id FROM pos WHERE pos=?;";
-
-    let id: i32 = tx.query_row(query, params![pos], |row| row.get(0))?;
-
-    Ok(id)
-}
-
-/// select id for a given sentence
-fn select_id_for_sentence(tx: &Transaction, sentence: &str) -> Result<i32, Box<dyn Error>> {
-    let query = "SELECT id FROM sentences WHERE sentence=?;";
-
-    let id: i32 = tx.query_row(query, params![sentence], |row| row.get(0))?;
-
-    Ok(id)
-}
-
-/// select id for a given surface string
-fn select_id_for_surface_string(
-    tx: &Transaction,
-    surface_string: &str,
-) -> Result<i32, Box<dyn Error>> {
-    let query = "SELECT id FROM surface_strings WHERE surface_string=?;";
-
-    let id: i32 = tx.query_row(query, params![surface_string], |row| row.get(0))?;
-
-    Ok(id)
-}
-
-fn insert_join(
-    tx: &Transaction,
-    exp_id: i32,
-    pos_id: i32,
-    sen_id: i32,
-    sur_id: i32,
-) -> Result<(), Box<dyn Error>> {
-    let query = "INSERT OR IGNORE INTO expressions_pos_sentences_surface_strings 
-        (expression_id, pos_id, sentence_id, surface_string_id) VALUES (?,?,?,?);";
-
-    tx.execute(query, params![exp_id, pos_id, sen_id, sur_id])?;
-
-    Ok(())
-}
-
-/// insert Expression struct into database
+/// insert Term into database
 pub fn insert_term(tx: &Transaction, term: &Term) -> Result<(), Box<dyn Error>> {
     let expression = term.expression();
     let pos = term.pos();
@@ -214,39 +167,6 @@ pub fn insert_term(tx: &Transaction, term: &Term) -> Result<(), Box<dyn Error>> 
 /// * `conn` - A &Connection object
 /// * `expression_list` - The Expression objects to add to the database
 /// * `callback` - A function that is called after each expression is inserted
-
-pub fn insert_expression_list(
-    conn: &mut Connection,
-    expression_list: Vec<Expression>,
-    callback: &dyn Fn(),
-) -> Result<(), Box<dyn Error>> {
-    let tx = conn.transaction()?;
-
-    for expression in expression_list.iter() {
-        let expression_string = expression.get_expression();
-        let pos_string = &expression.get_pos()[0];
-        let sentence_string = &expression.get_sentence()[0];
-        let surface_string = &expression.get_surface_string()[0];
-
-        query::expression::insert(&tx, expression_string)?;
-        query::pos::insert(&tx, pos_string)?;
-        query::sentence::insert(&tx, sentence_string)?;
-        query::surface_string::insert(&tx, surface_string)?;
-
-        let expression_id = query::expression::select_id(&tx, expression_string)?;
-        let pos_id = query::pos::select_id(&tx, pos_string)?;
-        let sentence_id = query::sentence::select_id(&tx, sentence_string)?;
-        let surface_string_id = query::surface_string::select_id(&tx, surface_string)?;
-
-        query::insert_join(&tx, expression_id, pos_id, sentence_id, surface_string_id)?;
-
-        callback();
-    }
-
-    tx.commit()?;
-
-    Ok(())
-}
 
 fn create_select_query(
     in_anki: bool,
@@ -491,9 +411,65 @@ sql!(
     params = [conn: &Connection, expression: &str, is_excluded: i32]
 );
 
+/// select id for a given expression
+fn select_id_for_expression(tx: &Transaction, expression: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM expressions WHERE expression=?;";
+
+    let id: i32 = tx.query_row(query, params![expression], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given pos
+fn select_id_for_pos(tx: &Transaction, pos: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM pos WHERE pos=?;";
+
+    let id: i32 = tx.query_row(query, params![pos], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given sentence
+fn select_id_for_sentence(tx: &Transaction, sentence: &str) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM sentences WHERE sentence=?;";
+
+    let id: i32 = tx.query_row(query, params![sentence], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// select id for a given surface string
+fn select_id_for_surface_string(
+    tx: &Transaction,
+    surface_string: &str,
+) -> Result<i32, Box<dyn Error>> {
+    let query = "SELECT id FROM surface_strings WHERE surface_string=?;";
+
+    let id: i32 = tx.query_row(query, params![surface_string], |row| row.get(0))?;
+
+    Ok(id)
+}
+
+/// insert join
+fn insert_join(
+    tx: &Transaction,
+    exp_id: i32,
+    pos_id: i32,
+    sen_id: i32,
+    sur_id: i32,
+) -> Result<(), Box<dyn Error>> {
+    let query = "INSERT OR IGNORE INTO expressions_pos_sentences_surface_strings 
+        (expression_id, pos_id, sentence_id, surface_string_id) VALUES (?,?,?,?);";
+
+    tx.execute(query, params![exp_id, pos_id, sen_id, sur_id])?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::DropBehavior;
 
     #[test]
     #[ignore]

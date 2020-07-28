@@ -213,8 +213,7 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         let len = expression_list.len() as u64;
         let pb = progress_bar::new(len, "Importing");
-        database::insert_expression_list(conn, expression_list, &|| pb.inc(1))
-            .expect("Failed to insert expression");
+        insert_expression_list(conn, expression_list, &|| pb.inc(1))?;
 
         pb.finish_with_message("Imported");
 
@@ -534,4 +533,29 @@ fn select_imported_sentence_list(
     }
 
     Ok(duplicate_sentence_list)
+}
+
+pub fn insert_expression_list(
+    conn: &mut Connection,
+    expression_list: Vec<Expression>,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
+    let tx = database::transaction(conn)?;
+
+    for expression in expression_list.iter() {
+        let exp = expression.get_expression().to_string();
+        let pos = (&expression.get_pos()[0]).to_string();
+        let sen = (&expression.get_sentence()[0]).to_string();
+        let sur = (&expression.get_surface_string()[0]).to_string();
+
+        let term = database::Term::new(exp, pos, sen, sur);
+
+        database::insert_term(&tx, &term)?;
+
+        callback();
+    }
+
+    tx.commit()?;
+
+    Ok(())
 }

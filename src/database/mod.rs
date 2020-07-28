@@ -34,13 +34,6 @@ mod term;
 pub use table::initialize;
 pub use term::Term;
 
-/// DEPRACATED: get Connection object for database
-pub fn connect(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
-    let conn = Connection::open(path)?;
-
-    Ok(conn)
-}
-
 /// get Connection object for database
 pub fn connection(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
     let conn = Connection::open(path)?;

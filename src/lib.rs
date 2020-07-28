@@ -63,7 +63,7 @@ fn token_list_to_expression_list(token_list: Vec<Token>) -> Vec<Expression> {
 
 fn database_connection(database_path: &PathBuf) -> Connection {
     // @TODO remove the unwrap
-    database::connect(database_path).unwrap()
+    database::connection(database_path).unwrap()
 }
 
 fn format_anki_definition(

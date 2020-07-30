@@ -41,6 +41,7 @@ pub fn connection(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
     Ok(conn)
 }
 
+/// get Transaction from Connection
 pub fn transaction(conn: &mut Connection) -> Result<Transaction, Box<dyn Error>> {
     let tx = conn.transaction()?;
 
@@ -111,6 +112,30 @@ pub fn insert_term(tx: &Transaction, term: &Term) -> Result<(), Box<dyn Error>> 
     insert_join(tx, exp_id, pos_id, sen_id, sur_id)?;
 
     Ok(())
+}
+
+//select all terms from database
+pub fn select_term(tx: &Transaction) -> Result<Vec<Term>, Box<dyn Error>> {
+    let query = "SELECT expression, pos, sentence, surface_string FROM expressions
+        JOIN expressions_pos_sentences_surface_strings ON expression_id = expressions.id
+        JOIN pos ON pos.id = pos_id
+        JOIN sentences ON sentences.id = sentence_id
+        JOIN surface_strings ON surface_strings.id = surface_string_id;";
+
+    let mut statement = tx.prepare(query)?;
+
+    let term_list: Vec<Term> = statement.query_map(params![], |row| {
+            Ok(Term::new(
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+            ))
+    })?
+    .filter_map(|term| term.ok())
+    .collect();
+
+    Ok(term_list)
 }
 
 /// Insert a vector of Expression objects into the database.
@@ -441,7 +466,6 @@ mod tests {
     use rusqlite::DropBehavior;
 
     #[test]
-    #[ignore]
     fn test_select_sentence_list() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_select_sentence_list.db")?;
 
@@ -479,7 +503,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_insert_expression() -> Result<(), Box<dyn Error>> {
         let db_path = setup("test_insert_expression.db")?;
         let mut conn = connection(&db_path)?;
@@ -554,7 +577,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_insert_sentence() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_sentence.db")?;
@@ -611,7 +633,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_insert_pos() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_pos.db")?;
@@ -665,7 +686,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_insert_surface_string() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_surface_string.db")?;
@@ -720,7 +740,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_insert_term() -> Result<(), Box<dyn Error>> {
         // setup
         let db_path = setup("test_insert_term.db")?;
@@ -888,6 +907,62 @@ mod tests {
         for result in result_list.iter() {
             assert!(result.1.contains(&result.0), "join table is broken");
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_select_term() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_select_term.db")?;
+        let mut conn = connection(&db_path)?;
+
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+
+        let mut term_list: Vec<Term> = Vec::new();
+        term_list.push(Term::new(
+            "名前".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "名前".to_string(),
+        ));
+        term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "名前は何ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "今のアナウンスは何だったのですか。".to_string(),
+            "何".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "何".to_string(),
+        ));
+
+        term_list.sort();
+
+        for term in term_list.iter() {
+            insert_term(&tx, term)?;
+        }
+
+        // result
+        let mut results = select_term(&tx)?;
+        results.sort();
+
+        // cleanup
+        tx.finish()?;
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(results, term_list);
 
         Ok(())
     }

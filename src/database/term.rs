@@ -37,7 +37,11 @@ impl Term {
 
 impl Ord for Term {
     fn cmp(&self, other: &Self) -> Ordering {
-        (&self.expression, &self.surface_string, &self.sentence).cmp(&(&other.expression, &other.surface_string, &other.sentence))
+        (&self.expression, &self.surface_string, &self.sentence).cmp(&(
+            &other.expression,
+            &other.surface_string,
+            &other.sentence,
+        ))
     }
 }
 
@@ -49,6 +53,7 @@ impl PartialOrd for Term {
 
 impl PartialEq for Term {
     fn eq(&self, other: &Self) -> bool {
-        (&self.expression, &self.surface_string, &self.sentence) == (&other.expression, &other.surface_string, &other.sentence)
+        (&self.expression, &self.surface_string, &self.sentence)
+            == (&other.expression, &other.surface_string, &other.sentence)
     }
 }

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(Debug, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Term {
     expression: String,
     pos: String,

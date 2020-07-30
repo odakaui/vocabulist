@@ -66,8 +66,26 @@ pub fn select_term(tx: &Transaction) -> Result<Vec<Term>, Box<dyn Error>> {
         JOIN sentences ON sentences.id = sentence_id
         JOIN surface_strings ON surface_strings.id = surface_string_id;";
 
-    let mut statement = tx.prepare(query)?;
+    let term_list = term_list(tx, query)?;
 
+    Ok(term_list)
+}
+
+pub fn select_excluded_term(tx: &Transaction) -> Result<Vec<Term>, Box<dyn Error>> {
+    let query = "SELECT expression, pos, sentence, surface_string FROM expressions
+        JOIN expressions_pos_sentences_surface_strings ON expression_id = expressions.id
+        JOIN pos ON pos.id = pos_id
+        JOIN sentences ON sentences.id = sentence_id
+        JOIN surface_strings ON surface_strings.id = surface_string_id
+        WHERE expressions.is_excluded = 1;";
+
+    let term_list: Vec<Term> = term_list(tx, query)?;
+
+    Ok(term_list)
+}
+
+fn term_list(tx: &Transaction, query: &str) -> Result<Vec<Term>, Box<dyn Error>> {
+    let mut statement = tx.prepare(query)?;
     let term_list: Vec<Term> = statement
         .query_map(params![], |row| {
             Ok(Term::new(
@@ -428,6 +446,76 @@ mod tests {
 
         // assert
         assert_eq!(results, term_list);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_select_excluded_term() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_select_excluded_term.db")?;
+        let mut conn = connection(&db_path)?;
+
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+
+        let mut term_list: Vec<Term> = Vec::new();
+        term_list.push(Term::new(
+            "名前".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "名前".to_string(),
+        ));
+        term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "名前は何ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "今のアナウンスは何だったのですか。".to_string(),
+            "何".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "何".to_string(),
+        ));
+
+        let mut expected_list = term_list[2..].to_vec();
+
+        let excluded_expression = "何";
+
+        term_list.sort();
+        expected_list.sort();
+
+        for term in term_list.iter() {
+            insert_term(&tx, term)?;
+        }
+
+        let query = "UPDATE expressions SET is_excluded = 1 WHERE expression = ?;";
+
+        tx.execute(query, params![excluded_expression])?;
+
+        // result
+        let mut results = select_excluded_term(&tx)?;
+        results.sort();
+
+        // cleanup
+        tx.finish()?;
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(results, expected_list);
+        assert_ne!(results, term_list);
+        
+        for term in results.iter() {
+            assert_eq!(term.expression(), excluded_expression);
+        }
 
         Ok(())
     }

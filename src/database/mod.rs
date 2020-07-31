@@ -61,41 +61,38 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
 }
 
 //select all terms from database
-pub fn select_term(tx: &Transaction) -> Result<Vec<Term>, Box<dyn Error>> {
-    let query = "SELECT expression, pos, sentence, surface_string FROM expressions
-        JOIN expressions_pos_sentences_surface_strings ON expression_id = expressions.id
-        JOIN pos ON pos.id = pos_id
-        JOIN sentences ON sentences.id = sentence_id
-        JOIN surface_strings ON surface_strings.id = surface_string_id;";
+pub fn select_term(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
+    let query = match limit {
+        0 => {
+            "SELECT expression FROM expressions \
+                ORDER BY frequency DESC;".to_string()
+        },
+        _ => {
+            format!("SELECT expression FROM expressions \
+                ORDER BY frequency DESC \
+                LIMIT {};", limit)
+        }
+    };
 
-    let term_list = term_list(tx, query)?;
+    let term_list = term_list(tx, &query)?;
 
     Ok(term_list)
 }
 
-pub fn select_excluded_term(tx: &Transaction) -> Result<Vec<Term>, Box<dyn Error>> {
-    let query = "SELECT expression, pos, sentence, surface_string FROM expressions
-        JOIN expressions_pos_sentences_surface_strings ON expression_id = expressions.id
-        JOIN pos ON pos.id = pos_id
-        JOIN sentences ON sentences.id = sentence_id
-        JOIN surface_strings ON surface_strings.id = surface_string_id
+pub fn select_excluded_term(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+    let query = "SELECT expression, pos, sentence, surface_string FROM expressions \
         WHERE expressions.is_excluded = 1;";
 
-    let term_list: Vec<Term> = term_list(tx, query)?;
+    let term_list: Vec<String> = term_list(tx, query)?;
 
     Ok(term_list)
 }
 
-fn term_list(tx: &Transaction, query: &str) -> Result<Vec<Term>, Box<dyn Error>> {
+fn term_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let mut statement = tx.prepare(query)?;
-    let term_list: Vec<Term> = statement
+    let term_list: Vec<String> = statement
         .query_map(params![], |row| {
-            Ok(Term::new(
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-            ))
+                Ok(row.get(0)?)
         })?
         .filter_map(|term| term.ok())
         .collect();
@@ -419,6 +416,12 @@ mod tests {
             "は".to_string(),
         ));
         term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "『しんのすけ』という名前はからかいの対象ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
             "何".to_string(),
             "名詞".to_string(),
             "今のアナウンスは何だったのですか。".to_string(),
@@ -430,16 +433,36 @@ mod tests {
             "名前は何ですか".to_string(),
             "何".to_string(),
         ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "何時ですか".to_string(),
+            "何".to_string(),
+        ));
 
         term_list.sort();
+
+        let expected_term = vec!["何".to_string()];
+        let expected_list = vec![
+            "何".to_string(),
+            "は".to_string(),
+            "名前".to_string()
+        ];
 
         for term in term_list.iter() {
             insert_term(&tx, term)?;
         }
 
+        let mut statement = tx.prepare("SELECT count(*) FROM expressions;")?;
+        let term_count: i32 = statement.query_map(params![], |row| Ok(row.get(0)?))?
+            .filter_map(|row| row.ok())
+            .collect::<Vec<i32>>()[0];
+
+        statement.finalize()?;
+
         // result
-        let mut results = select_term(&tx)?;
-        results.sort();
+        let mut result_list = select_term(&tx, 0)?;
+        let mut result_one = select_term(&tx, 1)?;
 
         // cleanup
         tx.finish()?;
@@ -447,7 +470,9 @@ mod tests {
         tear_down(db_path)?;
 
         // assert
-        assert_eq!(results, term_list);
+        assert_eq!(term_count, 3);
+        assert_eq!(result_list, expected_list);
+        assert_eq!(result_one, expected_term);
 
         Ok(())
     }
@@ -487,7 +512,7 @@ mod tests {
             "何".to_string(),
         ));
 
-        let mut expected_list = term_list[2..].to_vec();
+        let mut expected_list = vec!["何".to_string()];
 
         let excluded_expression = "何";
 
@@ -513,11 +538,6 @@ mod tests {
 
         // assert
         assert_eq!(results, expected_list);
-        assert_ne!(results, term_list);
-
-        for term in results.iter() {
-            assert_eq!(term.expression(), excluded_expression);
-        }
 
         Ok(())
     }

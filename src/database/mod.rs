@@ -59,7 +59,7 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
     Ok(statement.exists(params![sentence])?)
 }
 
-//select all terms from database
+/// select expressions from database
 pub fn select_expression(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
         0 => {
@@ -78,6 +78,7 @@ pub fn select_expression(tx: &Transaction, limit: u32) -> Result<Vec<String>, Bo
     Ok(term_list)
 }
 
+/// select excluded expressions from database
 pub fn select_expression_excluded(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
         0 => {

@@ -548,6 +548,7 @@ mod tests {
 
         if db_path.is_file() {
             panic!("database file already exists.");
+        }
 
         Ok(db_path)
     }

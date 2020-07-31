@@ -33,7 +33,6 @@ mod select_builder;
 mod table;
 mod term;
 
-pub use select_builder::SelectBuilder;
 pub use table::initialize;
 pub use term::Term;
 

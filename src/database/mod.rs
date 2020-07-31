@@ -102,6 +102,30 @@ pub fn select_expression_excluded(
     Ok(expression_list)
 }
 
+/// select expressions in anki from database
+pub fn select_expression_in_anki(
+    tx: &Transaction,
+    limit: u32,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let query = match limit {
+        0 => "SELECT expression FROM expressions \
+            WHERE expressions.in_anki = 1 \
+            ORDER BY frequency DESC;"
+            .to_string(),
+        _ => format!(
+            "SELECT expression FROM expressions \
+                    WHERE expressions.in_anki = 1 \
+                    ORDER BY frequency DESC
+                    LIMIT {};",
+            limit
+        ),
+    };
+
+    let expression_list: Vec<String> = expression_list(tx, &query)?;
+
+    Ok(expression_list)
+}
+
 fn expression_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let mut statement = tx.prepare(query)?;
     let expression_list: Vec<String> = statement
@@ -552,6 +576,86 @@ mod tests {
         // result
         let result_all = select_expression_excluded(&tx, 0)?;
         let result_one = select_expression_excluded(&tx, 1)?;
+
+        // cleanup
+        tx.finish()?;
+        conn.close().or(Err("Failed to close database"))?;
+        tear_down(db_path)?;
+
+        // assert
+        assert_eq!(result_all, expected_all);
+        assert_eq!(result_one, expected_one);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_select_expression_in_anki() -> Result<(), Box<dyn Error>> {
+        // setup
+        let db_path = setup("test_select_expression_in_anki")?;
+        let mut conn = connection(&db_path)?;
+
+        let tx = transaction(&mut conn)?;
+        initialize(&tx)?;
+
+        let mut term_list: Vec<Term> = Vec::new();
+        term_list.push(Term::new(
+            "名前".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "名前".to_string(),
+        ));
+        term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "名前は何ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "『しんのすけ』という名前はからかいの対象ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "今のアナウンスは何だったのですか。".to_string(),
+            "何".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "名前は何ですか".to_string(),
+            "何".to_string(),
+        ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "何時ですか".to_string(),
+            "何".to_string(),
+        ));
+
+        let expected_all = vec!["何".to_string(), "は".to_string()];
+
+        let expected_one = vec!["何".to_string()];
+
+        let in_anki_list = vec!["何", "は"];
+
+        let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) \
+                        ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
+        for term in term_list.iter() {
+            tx.execute(query, params![term.expression()])?;
+        }
+
+        let query = "UPDATE expressions SET in_anki = 1 WHERE expression = ?;";
+        for term in in_anki_list.iter() {
+            tx.execute(query, params![term])?;
+        }
+
+        // result
+        let result_all = select_expression_in_anki(&tx, 0)?;
+        let result_one = select_expression_in_anki(&tx, 1)?;
 
         // cleanup
         tx.finish()?;

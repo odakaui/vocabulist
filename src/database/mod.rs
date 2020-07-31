@@ -79,11 +79,24 @@ pub fn select_term(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn 
     Ok(term_list)
 }
 
-pub fn select_excluded_term(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
-    let query = "SELECT expression, pos, sentence, surface_string FROM expressions \
-        WHERE expressions.is_excluded = 1;";
+pub fn select_term_excluded(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
+    let query = match limit {
+        0 => {
+            "SELECT expression FROM expressions \
+                WHERE expressions.is_excluded = 1 \
+                ORDER BY frequency DESC;".to_string()
+        },
+          _ => {
+              format!(
+                "SELECT expression FROM expressions \
+                    WHERE expressions.is_excluded = 1 \
+                    ORDER BY frequency DESC
+                    LIMIT {};", limit
+                    )
+          }
+    };
 
-    let term_list: Vec<String> = term_list(tx, query)?;
+    let term_list: Vec<String> = term_list(tx, &query)?;
 
     Ok(term_list)
 }
@@ -500,6 +513,12 @@ mod tests {
             "は".to_string(),
         ));
         term_list.push(Term::new(
+            "は".to_string(),
+            "助詞".to_string(),
+            "『しんのすけ』という名前はからかいの対象ですか".to_string(),
+            "は".to_string(),
+        ));
+        term_list.push(Term::new(
             "何".to_string(),
             "名詞".to_string(),
             "今のアナウンスは何だったのですか。".to_string(),
@@ -511,13 +530,23 @@ mod tests {
             "名前は何ですか".to_string(),
             "何".to_string(),
         ));
+        term_list.push(Term::new(
+            "何".to_string(),
+            "名詞".to_string(),
+            "何時ですか".to_string(),
+            "何".to_string(),
+        ));
 
-        let mut expected_list = vec!["何".to_string()];
+        let expected_all = vec![
+            "何".to_string(),
+            "は".to_string(),
+        ];
 
-        let excluded_expression = "何";
+        let expected_one = vec![
+            "何".to_string(),
+        ];
 
-        term_list.sort();
-        expected_list.sort();
+        let excluded_list = vec!["何", "は"];
 
         for term in term_list.iter() {
             insert_term(&tx, term)?;
@@ -525,11 +554,13 @@ mod tests {
 
         let query = "UPDATE expressions SET is_excluded = 1 WHERE expression = ?;";
 
-        tx.execute(query, params![excluded_expression])?;
+        for term in excluded_list.iter() {
+            tx.execute(query, params![term])?;
+        }
 
         // result
-        let mut results = select_excluded_term(&tx)?;
-        results.sort();
+        let result_all = select_term_excluded(&tx, 0)?;
+        let result_one = select_term_excluded(&tx, 1)?;
 
         // cleanup
         tx.finish()?;
@@ -537,7 +568,8 @@ mod tests {
         tear_down(db_path)?;
 
         // assert
-        assert_eq!(results, expected_list);
+        assert_eq!(result_all, expected_all);
+        assert_eq!(result_one, expected_one);
 
         Ok(())
     }

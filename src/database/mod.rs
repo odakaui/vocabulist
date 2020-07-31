@@ -62,55 +62,54 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
 /// select expressions from database
 pub fn select_expression(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
-        0 => {
+        0 => "SELECT expression FROM expressions \
+                ORDER BY frequency DESC;"
+            .to_string(),
+        _ => format!(
             "SELECT expression FROM expressions \
-                ORDER BY frequency DESC;".to_string()
-        },
-        _ => {
-            format!("SELECT expression FROM expressions \
                 ORDER BY frequency DESC \
-                LIMIT {};", limit)
-        }
+                LIMIT {};",
+            limit
+        ),
     };
 
-    let term_list = term_list(tx, &query)?;
+    let expression_list = expression_list(tx, &query)?;
 
-    Ok(term_list)
+    Ok(expression_list)
 }
 
 /// select excluded expressions from database
-pub fn select_expression_excluded(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression_excluded(
+    tx: &Transaction,
+    limit: u32,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
-        0 => {
-            "SELECT expression FROM expressions \
+        0 => "SELECT expression FROM expressions \
                 WHERE expressions.is_excluded = 1 \
-                ORDER BY frequency DESC;".to_string()
-        },
-          _ => {
-              format!(
-                "SELECT expression FROM expressions \
+                ORDER BY frequency DESC;"
+            .to_string(),
+        _ => format!(
+            "SELECT expression FROM expressions \
                     WHERE expressions.is_excluded = 1 \
                     ORDER BY frequency DESC
-                    LIMIT {};", limit
-                    )
-          }
+                    LIMIT {};",
+            limit
+        ),
     };
 
-    let term_list: Vec<String> = term_list(tx, &query)?;
+    let expression_list: Vec<String> = expression_list(tx, &query)?;
 
-    Ok(term_list)
+    Ok(expression_list)
 }
 
-fn term_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn Error>> {
+fn expression_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let mut statement = tx.prepare(query)?;
-    let term_list: Vec<String> = statement
-        .query_map(params![], |row| {
-                Ok(row.get(0)?)
-        })?
+    let expression_list: Vec<String> = statement
+        .query_map(params![], |row| Ok(row.get(0)?))?
         .filter_map(|term| term.ok())
         .collect();
 
-    Ok(term_list)
+    Ok(expression_list)
 }
 
 /// Insert a vector of Expression objects into the database.
@@ -456,18 +455,15 @@ mod tests {
         term_list.sort();
 
         let expected_term = vec!["何".to_string()];
-        let expected_list = vec![
-            "何".to_string(),
-            "は".to_string(),
-            "名前".to_string()
-        ];
+        let expected_list = vec!["何".to_string(), "は".to_string(), "名前".to_string()];
 
         for term in term_list.iter() {
             insert_term(&tx, term)?;
         }
 
         let mut statement = tx.prepare("SELECT count(*) FROM expressions;")?;
-        let term_count: i32 = statement.query_map(params![], |row| Ok(row.get(0)?))?
+        let term_count: i32 = statement
+            .query_map(params![], |row| Ok(row.get(0)?))?
             .filter_map(|row| row.ok())
             .collect::<Vec<i32>>()[0];
 
@@ -537,14 +533,9 @@ mod tests {
             "何".to_string(),
         ));
 
-        let expected_all = vec![
-            "何".to_string(),
-            "は".to_string(),
-        ];
+        let expected_all = vec!["何".to_string(), "は".to_string()];
 
-        let expected_one = vec![
-            "何".to_string(),
-        ];
+        let expected_one = vec!["何".to_string()];
 
         let excluded_list = vec!["何", "は"];
 

@@ -546,6 +546,10 @@ mod tests {
 
         let db_path = test_dir.join(db_name);
 
+        if db_path.is_file() {
+            panic!("database file already exists.");
+        }
+
         Ok(db_path)
     }
 

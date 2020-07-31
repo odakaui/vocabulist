@@ -61,7 +61,7 @@ pub fn select_sentence_exists(conn: &Connection, sentence: &str) -> Result<bool,
 }
 
 //select all terms from database
-pub fn select_term(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
         0 => {
             "SELECT expression FROM expressions \
@@ -79,7 +79,7 @@ pub fn select_term(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn 
     Ok(term_list)
 }
 
-pub fn select_term_excluded(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression_excluded(tx: &Transaction, limit: u32) -> Result<Vec<String>, Box<dyn Error>> {
     let query = match limit {
         0 => {
             "SELECT expression FROM expressions \
@@ -407,9 +407,9 @@ mod tests {
     }
 
     #[test]
-    fn test_select_term() -> Result<(), Box<dyn Error>> {
+    fn test_select_expression() -> Result<(), Box<dyn Error>> {
         // setup
-        let db_path = setup("test_select_term.db")?;
+        let db_path = setup("test_select_expression.db")?;
         let mut conn = connection(&db_path)?;
 
         let tx = transaction(&mut conn)?;
@@ -474,8 +474,8 @@ mod tests {
         statement.finalize()?;
 
         // result
-        let mut result_list = select_term(&tx, 0)?;
-        let mut result_one = select_term(&tx, 1)?;
+        let mut result_list = select_expression(&tx, 0)?;
+        let mut result_one = select_expression(&tx, 1)?;
 
         // cleanup
         tx.finish()?;
@@ -491,9 +491,9 @@ mod tests {
     }
 
     #[test]
-    fn test_select_excluded_term() -> Result<(), Box<dyn Error>> {
+    fn test_select_expression_excluded() -> Result<(), Box<dyn Error>> {
         // setup
-        let db_path = setup("test_select_excluded_term.db")?;
+        let db_path = setup("test_select_expression_excluded")?;
         let mut conn = connection(&db_path)?;
 
         let tx = transaction(&mut conn)?;
@@ -559,8 +559,8 @@ mod tests {
         }
 
         // result
-        let result_all = select_term_excluded(&tx, 0)?;
-        let result_one = select_term_excluded(&tx, 1)?;
+        let result_all = select_expression_excluded(&tx, 0)?;
+        let result_one = select_expression_excluded(&tx, 1)?;
 
         // cleanup
         tx.finish()?;

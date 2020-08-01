@@ -94,83 +94,29 @@ mod tests {
 
     #[test]
     fn test_select_expression() -> Result<(), Box<dyn Error>> {
-        // setup
-        let db_path = setup("test_select_expression.db")?;
-        let mut conn = connection(&db_path)?;
+        run_test_select_expression("test_select_expression.db", |tx| {
+            let expected_term = vec!["何".to_string()];
+            let expected_list = vec!["何".to_string(), "は".to_string(), "名前".to_string()];
 
-        let tx = transaction(&mut conn)?;
-        initialize(&tx)?;
+            let mut statement = tx.prepare("SELECT count(*) FROM expressions;")?;
+            let term_count: i32 = statement
+                .query_map(params![], |row| Ok(row.get(0)?))?
+                .filter_map(|row| row.ok())
+                .collect::<Vec<i32>>()[0];
 
-        let mut term_list: Vec<Term> = Vec::new();
-        term_list.push(Term::new(
-            "名前".to_string(),
-            "名詞".to_string(),
-            "名前は何ですか".to_string(),
-            "名前".to_string(),
-        ));
-        term_list.push(Term::new(
-            "は".to_string(),
-            "助詞".to_string(),
-            "名前は何ですか".to_string(),
-            "は".to_string(),
-        ));
-        term_list.push(Term::new(
-            "は".to_string(),
-            "助詞".to_string(),
-            "『しんのすけ』という名前はからかいの対象ですか".to_string(),
-            "は".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "今のアナウンスは何だったのですか。".to_string(),
-            "何".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "名前は何ですか".to_string(),
-            "何".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "何時ですか".to_string(),
-            "何".to_string(),
-        ));
+            statement.finalize()?;
 
-        term_list.sort();
+            // result
+            let mut result_list = select_expression(&tx, 0)?;
+            let mut result_one = select_expression(&tx, 1)?;
 
-        let expected_term = vec!["何".to_string()];
-        let expected_list = vec!["何".to_string(), "は".to_string(), "名前".to_string()];
+            // assert
+            assert_eq!(term_count, 3);
+            assert_eq!(result_list, expected_list);
+            assert_eq!(result_one, expected_term);
 
-        let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) \
-                        ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
-        for term in term_list.iter() {
-            tx.execute(query, params![term.expression()])?;
-        }
-
-        let mut statement = tx.prepare("SELECT count(*) FROM expressions;")?;
-        let term_count: i32 = statement
-            .query_map(params![], |row| Ok(row.get(0)?))?
-            .filter_map(|row| row.ok())
-            .collect::<Vec<i32>>()[0];
-
-        statement.finalize()?;
-
-        // result
-        let mut result_list = select_expression(&tx, 0)?;
-        let mut result_one = select_expression(&tx, 1)?;
-
-        // cleanup
-        tx.finish()?;
-        conn.close().or(Err("Failed to close database"))?;
-        tear_down(db_path)?;
-
-        // assert
-        assert_eq!(term_count, 3);
-        assert_eq!(result_list, expected_list);
-        assert_eq!(result_one, expected_term);
+            Ok(())
+        });
 
         Ok(())
     }

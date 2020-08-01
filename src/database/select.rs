@@ -177,81 +177,27 @@ mod tests {
 
     #[test]
     fn test_select_expression_excluded() -> Result<(), Box<dyn Error>> {
-        // setup
-        let db_path = setup("test_select_expression_excluded")?;
-        let mut conn = connection(&db_path)?;
+        run_test_select_expression("test_select_expression_excluded.db", |tx| {
+            let expected_all = vec!["何".to_string(), "は".to_string()];
+            let expected_one = vec!["何".to_string()];
+            let excluded_list = vec!["何", "は"];
 
-        let tx = transaction(&mut conn)?;
-        initialize(&tx)?;
+            let query = "UPDATE expressions SET is_excluded = 1 WHERE expression = ?;";
 
-        let mut term_list: Vec<Term> = Vec::new();
-        term_list.push(Term::new(
-            "名前".to_string(),
-            "名詞".to_string(),
-            "名前は何ですか".to_string(),
-            "名前".to_string(),
-        ));
-        term_list.push(Term::new(
-            "は".to_string(),
-            "助詞".to_string(),
-            "名前は何ですか".to_string(),
-            "は".to_string(),
-        ));
-        term_list.push(Term::new(
-            "は".to_string(),
-            "助詞".to_string(),
-            "『しんのすけ』という名前はからかいの対象ですか".to_string(),
-            "は".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "今のアナウンスは何だったのですか。".to_string(),
-            "何".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "名前は何ですか".to_string(),
-            "何".to_string(),
-        ));
-        term_list.push(Term::new(
-            "何".to_string(),
-            "名詞".to_string(),
-            "何時ですか".to_string(),
-            "何".to_string(),
-        ));
+            for term in excluded_list.iter() {
+                tx.execute(query, params![term])?;
+            }
 
-        let expected_all = vec!["何".to_string(), "は".to_string()];
+            // result
+            let result_all = select_expression_excluded(&tx, 0)?;
+            let result_one = select_expression_excluded(&tx, 1)?;
 
-        let expected_one = vec!["何".to_string()];
+            // assert
+            assert_eq!(result_all, expected_all);
+            assert_eq!(result_one, expected_one);
 
-        let excluded_list = vec!["何", "は"];
-
-        let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) \
-                        ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
-        for term in term_list.iter() {
-            tx.execute(query, params![term.expression()])?;
-        }
-
-        let query = "UPDATE expressions SET is_excluded = 1 WHERE expression = ?;";
-
-        for term in excluded_list.iter() {
-            tx.execute(query, params![term])?;
-        }
-
-        // result
-        let result_all = select_expression_excluded(&tx, 0)?;
-        let result_one = select_expression_excluded(&tx, 1)?;
-
-        // cleanup
-        tx.finish()?;
-        conn.close().or(Err("Failed to close database"))?;
-        tear_down(db_path)?;
-
-        // assert
-        assert_eq!(result_all, expected_all);
-        assert_eq!(result_one, expected_one);
+            Ok(())
+        });
 
         Ok(())
     }

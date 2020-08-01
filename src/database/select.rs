@@ -116,7 +116,7 @@ mod tests {
             assert_eq!(result_one, expected_term);
 
             Ok(())
-        });
+        })?;
 
         Ok(())
     }
@@ -143,7 +143,7 @@ mod tests {
             assert_eq!(result_one, expected_one);
 
             Ok(())
-        });
+        })?;
 
         Ok(())
     }
@@ -169,7 +169,7 @@ mod tests {
             assert_eq!(result_one, expected_one);
 
             Ok(())
-        });
+        })?;
 
         Ok(())
     }

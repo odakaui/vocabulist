@@ -68,6 +68,20 @@ pub fn select_expression_in_anki(
     Ok(expression_list)
 }
 
+/// select pos for expression in database
+pub fn select_expression_pos(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+    todo!()
+}
+
+/// select sentence for expression in database
+pub fn select_expression_sentence(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+    todo!()
+}
+
+pub fn select_expression_surface_string(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+    todo!()
+}
+
 /// check sentence exists in database
 pub fn select_sentence_exists(tx: &Transaction, sentence: &str) -> Result<bool, Box<dyn Error>> {
     let mut statement = tx.prepare("SELECT sentence FROM sentences WHERE sentence = ?;")?;
@@ -87,7 +101,7 @@ fn expression_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn
 
 #[cfg(test)]
 mod tests {
-    use super::super::{connection, initialize, transaction, Term};
+    use super::super::{connection, initialize, transaction, Term, insert_term};
     use super::*;
     use rusqlite::DropBehavior;
     use std::path::PathBuf;
@@ -243,10 +257,8 @@ mod tests {
             "何".to_string(),
         ));
 
-        let query = "INSERT OR IGNORE INTO expressions (expression) VALUES (?) \
-                        ON CONFLICT (expression) DO UPDATE SET frequency = frequency + 1;";
         for term in term_list.iter() {
-            tx.execute(query, params![term.expression()])?;
+            insert_term(&tx, term)?;
         }
 
         // test

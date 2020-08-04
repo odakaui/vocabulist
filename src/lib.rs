@@ -532,15 +532,19 @@ fn filter_imported_expression_list(
 
 /// Create a list of sentences that have already been imported and that are in sentence_list.
 fn select_imported_sentence_list(
-    conn: &Connection,
+    conn: &mut Connection,
     sentence_list: &Vec<String>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
+    let tx = database::transaction(conn)?;
+
     let mut duplicate_sentence_list: Vec<String> = Vec::new();
     for sentence in sentence_list.iter() {
-        if database::select_sentence_exists(conn, sentence)? {
+        if database::select_sentence_exists(&tx, sentence)? {
             duplicate_sentence_list.push(sentence.to_string());
         }
     }
+
+    tx.commit()?;
 
     Ok(duplicate_sentence_list)
 }

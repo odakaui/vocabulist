@@ -1,5 +1,5 @@
 use crate::Expression;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -27,82 +27,37 @@ macro_rules! sql {
     }
 }
 
+mod insert;
 mod query;
+mod select;
+mod select_builder;
+mod table;
+mod term;
 
-/// Setup the database.
-///
-/// # Arguments
-///
-/// * `conn` - A &Connection object
+pub use table::initialize;
+pub use term::Term;
 
-fn initialize(conn: &Connection) -> Result<(), Box<dyn Error>> {
-    query::table::create_expressions(conn)?;
-    query::table::create_pos(conn)?;
-    query::table::create_sentences(conn)?;
-    query::table::create_surface_strings(conn)?;
-    query::table::create_expressions_pos_sentences_surface_strings(conn)?;
+pub use insert::insert_term;
 
-    Ok(())
+pub use select::select_expression;
+pub use select::select_expression_excluded;
+pub use select::select_expression_in_anki;
+pub use select::select_sentence_exists;
+
+/// get Connection object for database
+pub fn connection(path: &PathBuf) -> Result<Connection, Box<dyn Error>> {
+    let conn = Connection::open(path)?;
+
+    Ok(conn)
 }
 
-/// Open a connection to the database.
-///
-/// # Arguments
-///
-/// * `path` - An &str with the file system path to the database
+/// get Transaction from Connection
+pub fn transaction(conn: &mut Connection) -> Result<Transaction, Box<dyn Error>> {
+    let tx = conn.transaction()?;
 
-pub fn connect(path: &PathBuf) -> Connection {
-    let conn = Connection::open(path).expect("Failed to connect to the database");
-    initialize(&conn).expect("Failed to initialize database");
-
-    conn
+    Ok(tx)
 }
 
-/// Create a list of Expression objects with sentences that have not been inserted into the database.
-///
-/// # Arguments
-///
-/// * `conn` - A &Connection object
-/// * `sentence_list` - A Vec<String> of sentences that have already been imported
-/// * `expression_list` - A list of Expression objects
-
-pub fn filter_imported_expression_list(
-    sentence_list: &Vec<String>,
-    expression_list: Vec<Expression>,
-) -> Vec<Expression> {
-    let mut tmp_expression_list: Vec<Expression> = Vec::new();
-    for expression in expression_list.into_iter() {
-        let mut is_duplicate = false;
-        for sentence in sentence_list.iter() {
-            let sentence_string = &expression.get_sentence()[0];
-            if sentence_string == sentence {
-                is_duplicate = true;
-                break;
-            }
-        }
-
-        if !is_duplicate {
-            tmp_expression_list.push(expression);
-        }
-    }
-
-    tmp_expression_list
-}
-
-/// Create a list of sentences that have already been imported and that are in sentence_list.
-pub fn select_imported_sentence_list(
-    conn: &Connection,
-    sentence_list: &Vec<String>,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut duplicate_sentence_list: Vec<String> = Vec::new();
-    for sentence in sentence_list.iter() {
-        if query::sentence::exists(conn, sentence)? {
-            duplicate_sentence_list.push(sentence.to_string());
-        }
-    }
-
-    Ok(duplicate_sentence_list)
-}
 /// Insert a vector of Expression objects into the database.
 ///
 /// # Arguments
@@ -110,39 +65,6 @@ pub fn select_imported_sentence_list(
 /// * `conn` - A &Connection object
 /// * `expression_list` - The Expression objects to add to the database
 /// * `callback` - A function that is called after each expression is inserted
-
-pub fn insert_expression_list(
-    conn: &mut Connection,
-    expression_list: Vec<Expression>,
-    callback: &dyn Fn(),
-) -> Result<(), Box<dyn Error>> {
-    let tx = conn.transaction()?;
-
-    for expression in expression_list.iter() {
-        let expression_string = expression.get_expression();
-        let pos_string = &expression.get_pos()[0];
-        let sentence_string = &expression.get_sentence()[0];
-        let surface_string = &expression.get_surface_string()[0];
-
-        query::expression::insert(&tx, expression_string)?;
-        query::pos::insert(&tx, pos_string)?;
-        query::sentence::insert(&tx, sentence_string)?;
-        query::surface_string::insert(&tx, surface_string)?;
-
-        let expression_id = query::expression::select_id(&tx, expression_string)?;
-        let pos_id = query::pos::select_id(&tx, pos_string)?;
-        let sentence_id = query::sentence::select_id(&tx, sentence_string)?;
-        let surface_string_id = query::surface_string::select_id(&tx, surface_string)?;
-
-        query::insert_join(&tx, expression_id, pos_id, sentence_id, surface_string_id)?;
-
-        callback();
-    }
-
-    tx.commit()?;
-
-    Ok(())
-}
 
 fn create_select_query(
     in_anki: bool,
@@ -386,3 +308,8 @@ sql!(
     UPDATE_IS_EXCLUDED_FOR_EXPRESSION,
     params = [conn: &Connection, expression: &str, is_excluded: i32]
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+}

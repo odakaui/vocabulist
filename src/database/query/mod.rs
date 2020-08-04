@@ -5,7 +5,6 @@ pub mod expression;
 pub mod pos;
 pub mod sentence;
 pub mod surface_string;
-pub mod table;
 
 pub fn insert_join(
     tx: &Transaction,

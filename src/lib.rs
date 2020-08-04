@@ -62,7 +62,8 @@ fn token_list_to_expression_list(token_list: Vec<Token>) -> Vec<Expression> {
 }
 
 fn database_connection(database_path: &PathBuf) -> Connection {
-    database::connect(database_path)
+    // @TODO remove the unwrap
+    database::connection(database_path).unwrap()
 }
 
 fn format_anki_definition(
@@ -180,7 +181,10 @@ fn create_flashcards_from_expression_list(
 pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     let backend_string = p.backend();
     let path = Path::new(m.value_of("path").unwrap());
@@ -204,15 +208,14 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             token_list_to_expression_list(tokenizer.tokenize(&sentence_list, &mut callback)?);
         pb.finish_with_message("Tokenized");
 
-        let duplicate_sentence_list = database::select_imported_sentence_list(conn, &sentence_list)
+        let duplicate_sentence_list = select_imported_sentence_list(conn, &sentence_list)
             .expect("Failed to retrieve sentences from the database");
         let expression_list =
-            database::filter_imported_expression_list(&duplicate_sentence_list, expression_list);
+            filter_imported_expression_list(&duplicate_sentence_list, expression_list);
 
         let len = expression_list.len() as u64;
         let pb = progress_bar::new(len, "Importing");
-        database::insert_expression_list(conn, expression_list, &|| pb.inc(1))
-            .expect("Failed to insert expression");
+        insert_expression_list(conn, expression_list, &|| pb.inc(1))?;
 
         pb.finish_with_message("Imported");
 
@@ -242,7 +245,10 @@ pub fn import(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let conn = database::connect(database_path);
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     match m.is_present("pos") {
         true => {
@@ -290,7 +296,10 @@ pub fn list(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -331,7 +340,10 @@ pub fn exclude(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     if let Some(path) = m.value_of("path") {
         let file_content = fs::read_to_string(path).expect("Failed to open file");
@@ -372,7 +384,10 @@ pub fn include(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
 pub fn generate(p: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // Initialize the database
     let database_path = p.database_path();
-    let mut conn = database::connect(database_path);
+    let mut conn = database::connection(database_path)?;
+    let tx = database::transaction(&mut conn)?;
+    database::initialize(&tx)?;
+    tx.commit()?;
 
     let dictionary_path = p.dictionary_path();
     let dict = dictionary::connect(&dictionary_path)?;
@@ -488,6 +503,73 @@ pub fn config(_: Config, m: &ArgMatches) -> Result<(), Box<dyn Error>> {
             fs::write(config_file, &toml)?;
         }
     }
+
+    Ok(())
+}
+
+fn filter_imported_expression_list(
+    sentence_list: &Vec<String>,
+    expression_list: Vec<Expression>,
+) -> Vec<Expression> {
+    let mut tmp_expression_list: Vec<Expression> = Vec::new();
+    for expression in expression_list.into_iter() {
+        let mut is_duplicate = false;
+        for sentence in sentence_list.iter() {
+            let sentence_string = &expression.get_sentence()[0];
+            if sentence_string == sentence {
+                is_duplicate = true;
+                break;
+            }
+        }
+
+        if !is_duplicate {
+            tmp_expression_list.push(expression);
+        }
+    }
+
+    tmp_expression_list
+}
+
+/// Create a list of sentences that have already been imported and that are in sentence_list.
+fn select_imported_sentence_list(
+    conn: &mut Connection,
+    sentence_list: &Vec<String>,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let tx = database::transaction(conn)?;
+
+    let mut duplicate_sentence_list: Vec<String> = Vec::new();
+    for sentence in sentence_list.iter() {
+        if database::select_sentence_exists(&tx, sentence)? {
+            duplicate_sentence_list.push(sentence.to_string());
+        }
+    }
+
+    tx.commit()?;
+
+    Ok(duplicate_sentence_list)
+}
+
+pub fn insert_expression_list(
+    conn: &mut Connection,
+    expression_list: Vec<Expression>,
+    callback: &dyn Fn(),
+) -> Result<(), Box<dyn Error>> {
+    let tx = database::transaction(conn)?;
+
+    for expression in expression_list.iter() {
+        let exp = expression.get_expression().to_string();
+        let pos = (&expression.get_pos()[0]).to_string();
+        let sen = (&expression.get_sentence()[0]).to_string();
+        let sur = (&expression.get_surface_string()[0]).to_string();
+
+        let term = database::Term::new(exp, pos, sen, sur);
+
+        database::insert_term(&tx, &term)?;
+
+        callback();
+    }
+
+    tx.commit()?;
 
     Ok(())
 }

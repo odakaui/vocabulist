@@ -69,16 +69,25 @@ pub fn select_expression_in_anki(
 }
 
 /// select pos for expression in database
-pub fn select_expression_pos(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression_pos(
+    tx: &Transaction,
+    expression: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     todo!()
 }
 
 /// select sentence for expression in database
-pub fn select_expression_sentence(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression_sentence(
+    tx: &Transaction,
+    expression: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     todo!()
 }
 
-pub fn select_expression_surface_string(tx: &Transaction) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn select_expression_surface_string(
+    tx: &Transaction,
+    expression: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     todo!()
 }
 
@@ -101,7 +110,7 @@ fn expression_list(tx: &Transaction, query: &str) -> Result<Vec<String>, Box<dyn
 
 #[cfg(test)]
 mod tests {
-    use super::super::{connection, initialize, transaction, Term, insert_term};
+    use super::super::{connection, initialize, insert_term, transaction, Term};
     use super::*;
     use rusqlite::DropBehavior;
     use std::path::PathBuf;
@@ -189,6 +198,27 @@ mod tests {
     }
 
     #[test]
+    fn test_select_expression_pos() -> Result<(), Box<dyn Error>> {
+        run_test_select_expression("test_select_expression_pos.db", |tx| {
+            let expression = "何";
+            let pos_list: Vec<String> =
+                vec!["名詞", "助詞"].iter().map(|x| x.to_string()).collect();
+
+            let result = select_expression_pos(&tx, expression)?;
+
+            assert_eq!(result.len(), pos_list.len(), "Unexpected number of pos");
+
+            for pos in result.iter() {
+                assert!(pos_list.contains(&pos), "Unexpected pos");
+            }
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
     fn test_select_sentence_exists() -> Result<(), Box<dyn Error>> {
         run_test_select_sentence("test_select_sentence_exists.db", |tx| {
             let sentence = "プロ野球は今、客を５０００人まで入れて試合をしています。";
@@ -246,7 +276,7 @@ mod tests {
         ));
         term_list.push(Term::new(
             "何".to_string(),
-            "名詞".to_string(),
+            "助詞".to_string(),
             "名前は何ですか".to_string(),
             "何".to_string(),
         ));
